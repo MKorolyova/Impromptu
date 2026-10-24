@@ -1,0 +1,14 @@
+name: impromptu
+services:
+
+  api:
+    image: node:latest
+    working_dir: /usr/src/app
+    volumes:
+      - ./:/usr/src/app
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+
+
