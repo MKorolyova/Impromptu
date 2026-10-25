@@ -18,6 +18,9 @@ struct HomeViewModelTests {
         let services = Services(
             account: MockAccountService(),
             activities: MockActivityService(),
+            friends: MockFriendService(),
+            calendar: MockCalendarService(),
+            statusPreferences: MockStatusPreferencesStore(),
             statuses: statuses ?? MockStatusService(),
             people: people ?? MockPeopleService(),
             nearbyAlerts: nearbyAlerts ?? MockNearbyAlerts(enabled: false),
@@ -76,38 +79,56 @@ struct HomeViewModelTests {
         #expect(!viewModel.people.contains { $0.id == SampleData.user.id })
     }
 
-    @Test func publishingDraftSetsStatusAndClosesDropDown() async {
+    @Test func updatingStatusUsesActivityLengthAndConfirms() async {
         let viewModel = makeViewModel(statuses: MockStatusService(status: nil))
         await viewModel.load()
-        viewModel.toggleComposer()
-        #expect(viewModel.isComposerOpen)
         #expect(!viewModel.canPublishDraft)
 
         let activity = SampleData.activities[0]
         viewModel.draft.activity = activity
         viewModel.draft.note = "  Hi  "
-        viewModel.draft.durationMinutes = 30
         await viewModel.publishDraft()
 
         #expect(viewModel.myStatus?.activity.id == activity.id)
         #expect(viewModel.myStatus?.note == "Hi")
         let length = viewModel.myStatus.map { $0.expiresAt.timeIntervalSince($0.startedAt) } ?? 0
-        #expect(abs(length - 30 * 60) < 0.001)
-        #expect(!viewModel.isComposerOpen)
+        #expect(abs(length - activity.defaultDuration) < 0.001)
+        #expect(viewModel.showsUpdateConfirmation)
         #expect(widgets.lastStatus?.note == "Hi")
 
         await viewModel.clearStatus()
         #expect(viewModel.myStatus == nil)
+        #expect(viewModel.draft == StatusDraft())
         #expect(widgets.lastStatus == nil)
     }
 
-    @Test func openingDropDownStartsFromCurrentStatus() async {
+    @Test func composerStartsFromCurrentStatus() async {
         let viewModel = makeViewModel()
         await viewModel.load()
-        viewModel.toggleComposer()
 
         #expect(viewModel.draft.activity?.id == viewModel.myStatus?.activity.id)
         #expect(viewModel.draft.note == viewModel.myStatus?.note)
+    }
+
+    @Test func dropDownListsSavedActivities() async {
+        let viewModel = makeViewModel()
+        await viewModel.load()
+
+        // The mock saves the first five; the drafted current status is kept in the list too.
+        let saved = Set(SampleData.activities.prefix(5).map(\.id))
+        #expect(viewModel.myActivities.filter { saved.contains($0.id) }.count == 5)
+        #expect(viewModel.myActivities.allSatisfy { saved.contains($0.id) || $0 == viewModel.draft.activity })
+    }
+
+    @Test func renamingUpdatesWidget() async {
+        let viewModel = makeViewModel()
+        await viewModel.load()
+        var renamed = SampleData.user
+        renamed.nickname = "Lex"
+        viewModel.userDidChange(renamed)
+
+        #expect(viewModel.user.displayName == "Lex")
+        #expect(widgets.syncCount == 2)
     }
 
     @Test func customActivitiesAreAddedFirstAndDeletable() async throws {
@@ -151,6 +172,238 @@ struct SessionViewModelTests {
         await viewModel.submit(to: session)
         #expect(session.user == nil)
         #expect(viewModel.errorMessage == "Invalid email or password")
+    }
+}
+
+@MainActor
+struct RegistrationViewModelTests {
+    private let account = MockAccountService(signedIn: false)
+    private let activities = MockActivityService()
+    private let calendar = MockCalendarService()
+    private let preferences = MockStatusPreferencesStore()
+
+    private var services: Services {
+        Services(
+            account: account,
+            activities: activities,
+            friends: MockFriendService(),
+            calendar: calendar,
+            statusPreferences: preferences,
+            statuses: MockStatusService(),
+            people: MockPeopleService(),
+            nearbyAlerts: MockNearbyAlerts(enabled: false),
+            noteRequests: MockNoteRequestService(),
+            noteMonitor: MockNoteRequestMonitor(),
+            location: MockLocationProvider(),
+            router: AppRouter(),
+            widgets: MockWidgetSyncService()
+        )
+    }
+
+    /// Runs the first two steps, which creates the account.
+    private func makeAccount(_ viewModel: RegistrationViewModel, session: SessionViewModel) async {
+        viewModel.email = "new@example.com"
+        viewModel.password = "password1"
+        await viewModel.advance(session: session)
+        viewModel.firstName = " Ada "
+        viewModel.lastName = "Lovelace"
+        await viewModel.advance(session: session)
+    }
+
+    @Test func takenEmailStopsAtFirstStep() async {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        viewModel.email = SampleData.user.email
+        viewModel.password = "password1"
+        await viewModel.advance(session: session)
+
+        #expect(viewModel.step == .credentials)
+        #expect(viewModel.errorMessage == RegistrationViewModel.emailTakenMessage)
+    }
+
+    @Test func accountIsCreatedAfterNamesWithoutSigningIn() async {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        #expect(viewModel.step == .activities)
+        #expect(viewModel.user?.firstName == "Ada")
+        #expect(!viewModel.canGoBack)
+        #expect(session.user == nil)
+        #expect(viewModel.activities.count == SampleData.activities.count)
+    }
+
+    @Test func needsFiveActivitiesAndSavesDefaults() async {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        SampleData.activities.prefix(4).forEach(viewModel.toggle)
+        #expect(!viewModel.canContinue)
+        #expect(viewModel.remainingActivityCount == 1)
+
+        viewModel.toggle(SampleData.activities[4])
+        #expect(viewModel.canContinue)
+        await viewModel.advance(session: session)
+
+        #expect(viewModel.step == .calendar)
+        let savedNames = Set(activities.activities.filter { activities.savedIds.contains($0.id) }.map(\.name))
+        #expect(savedNames.isSuperset(of: RegistrationViewModel.defaultActivityNames))
+        #expect(activities.savedIds.count == 7)
+    }
+
+    @Test func searchWithNoMatchOffersAdd() async {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        viewModel.query = "Cod"
+        #expect(!viewModel.searchResults.isEmpty)
+        #expect(!viewModel.canAddSearchedActivity)
+
+        viewModel.query = "Free"
+        #expect(viewModel.queryIsDefaultActivity)
+        #expect(!viewModel.canAddSearchedActivity)
+
+        viewModel.query = "Kitesurfing"
+        #expect(viewModel.canAddSearchedActivity)
+        await viewModel.addSearchedActivity()
+        #expect(viewModel.selectedActivities.map(\.name) == ["Kitesurfing"])
+        #expect(viewModel.activities.first?.isCustom == true)
+        #expect(viewModel.query.isEmpty)
+    }
+
+    @Test func calendarResultIsReadFromCallback() async {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        #expect(await viewModel.startCalendarConnection() != nil)
+        #expect(viewModel.calendarState == .connecting)
+        viewModel.finishCalendarConnection(callbackURL: URL(string: "impromptu://google-calendar?result=denied")!)
+        guard case .failed = viewModel.calendarState else {
+            Issue.record("Expected a failure, got \(viewModel.calendarState)")
+            return
+        }
+        viewModel.finishCalendarConnection(callbackURL: URL(string: "impromptu://google-calendar?result=connected")!)
+        #expect(viewModel.calendarState == .connected)
+        #expect(viewModel.statusSources.contains(.calendar))
+    }
+
+    @Test func finishingSavesPreferencesAndSignsIn() async throws {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+        SampleData.activities.prefix(5).forEach(viewModel.toggle)
+        await viewModel.advance(session: session)
+        await viewModel.advance(session: session)
+        #expect(viewModel.step == .statusSources)
+
+        viewModel.setStatusSource(.location, isOn: true)
+        await viewModel.advance(session: session)
+
+        let userId = try #require(viewModel.user?.id)
+        #expect(session.user?.id == userId)
+        #expect(preferences.sources(for: userId) == [.manual, .location])
+    }
+}
+
+@MainActor
+struct SettingsViewModelTests {
+    private let friends = MockFriendService()
+
+    private func makeViewModel() -> (SettingsViewModel, SessionViewModel) {
+        let services = Services(
+            account: MockAccountService(),
+            activities: MockActivityService(),
+            friends: friends,
+            calendar: MockCalendarService(),
+            statusPreferences: MockStatusPreferencesStore(),
+            statuses: MockStatusService(),
+            people: MockPeopleService(),
+            nearbyAlerts: MockNearbyAlerts(enabled: false),
+            noteRequests: MockNoteRequestService(),
+            noteMonitor: MockNoteRequestMonitor(),
+            location: MockLocationProvider(),
+            router: AppRouter(),
+            widgets: MockWidgetSyncService()
+        )
+        let session = SessionViewModel(services: services)
+        session.completeRegistration(SampleData.user)
+        return (SettingsViewModel(user: SampleData.user, services: services), session)
+    }
+
+    @Test func savingNameUpdatesSession() async {
+        let (viewModel, session) = makeViewModel()
+        #expect(!viewModel.canSaveProfile)
+
+        viewModel.nickname = " Lex "
+        #expect(viewModel.canSaveProfile)
+        await viewModel.saveProfile(session: session)
+
+        #expect(session.user?.nickname == "Lex")
+        #expect(session.user?.displayName == "Lex")
+        #expect(!viewModel.hasProfileChanges)
+    }
+
+    @Test func addingByEmailGrantsOnlyThatList() async throws {
+        let (viewModel, _) = makeViewModel()
+        await viewModel.loadFriends()
+        viewModel.startAdding(to: .location)
+        viewModel.friendEmail = "PRIYA@example.com"
+
+        #expect(await viewModel.addFriendByEmail())
+        let priya = try #require(viewModel.friends.first { $0.firstName == "Priya" })
+        #expect(priya.canSeeLocation)
+        #expect(!priya.canSeeNotes)
+        #expect(viewModel.addingTo == nil)
+    }
+
+    @Test func unknownEmailExplainsWhy() async {
+        let (viewModel, _) = makeViewModel()
+        viewModel.startAdding(to: .notes)
+        viewModel.friendEmail = "nobody@example.com"
+
+        #expect(!(await viewModel.addFriendByEmail()))
+        #expect(viewModel.addFriendError?.contains("No one") == true)
+        #expect(viewModel.addingTo == .notes)
+    }
+
+    @Test func removingFromLastListRemovesFriend() async throws {
+        let (viewModel, _) = makeViewModel()
+        await viewModel.loadFriends()
+        let sam = try #require(viewModel.friends.first { $0.firstName == "Sam" })
+
+        await viewModel.remove(sam, from: .location)
+        #expect(viewModel.friends(in: .location).isEmpty)
+        #expect(viewModel.friends(in: .notes).contains { $0.id == sam.id })
+
+        let updated = try #require(viewModel.friends.first { $0.id == sam.id })
+        await viewModel.remove(updated, from: .notes)
+        #expect(!viewModel.friends.contains { $0.id == sam.id })
+    }
+
+    @Test func keepsAtLeastOneStatusSource() {
+        let (viewModel, _) = makeViewModel()
+        viewModel.setStatusSource(.manual, isOn: false)
+        #expect(viewModel.statusSources == [.manual])
+    }
+}
+
+struct BrandTests {
+    @Test func gmtOffsetLabels() {
+        let winter = Date(timeIntervalSince1970: 1_800_000_000) // January
+        #expect(GMTOffset.label(for: "America/Bogota", at: winter) == "GMT-5")
+        #expect(GMTOffset.label(for: "Asia/Kolkata", at: winter) == "GMT+5:30")
+        #expect(GMTOffset.label(for: "UTC", at: winter) == "GMT")
+        #expect(GMTOffset.label(for: "Not/AZone") == nil)
+    }
+
+    @Test func runningGetsRunnerSymbol() {
+        #expect(ActivitySymbol.name(for: "Running") == "figure.run")
+        #expect(ActivitySymbol.name(for: "Running errands") == "bag.fill")
+        #expect(ActivitySymbol.name(for: "Do not disturb") == "moon.fill")
+        #expect(ActivitySymbol.name(for: "Free") == "hand.wave.fill")
     }
 }
 
@@ -203,7 +456,7 @@ struct APIContractTests {
         {"user":{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11","email":"a@b.co","firstName":"Ada","lastName":"L",
           "nickname":null,"timezone":"America/Chicago","createdAt":"2026-10-24T19:54:00.123Z","updatedAt":"2026-10-24T19:54:00.123Z"}}
         """#.utf8)
-        #expect(try JSONDecoder.api.decode(UserEnvelope.self, from: json).user.displayName == "Ada")
+        #expect(try JSONDecoder.api.decode(UserEnvelope.self, from: json).user.displayName == "Ada L")
     }
 
     @Test func decodesPeopleList() throws {
@@ -234,6 +487,45 @@ struct APIContractTests {
         let request = CreateStatusRequest(activityId: UUID(), note: nil, expiresAt: nil)
         let object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.api.encode(request)) as? [String: Any])
         #expect(Set(object.keys) == ["activityId"])
+    }
+
+    @Test func decodesFriend() throws {
+        struct FriendsEnvelope: Decodable { var friends: [Friend] }
+        let json = Data(#"""
+        {"friends":[{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f13","firstName":"Bo","lastName":"M","nickname":null,
+          "canSeeLocation":true,"canSeeNotes":false}]}
+        """#.utf8)
+        let friend = try #require(try JSONDecoder.api.decode(FriendsEnvelope.self, from: json).friends.first)
+        #expect(friend.canSeeLocation && !friend.canSeeNotes)
+        #expect(friend.displayName == "Bo M")
+    }
+
+    @Test func updateUserAlwaysSendsNickname() throws {
+        let request = UpdateUserRequest(firstName: "Ada", lastName: "L", nickname: nil)
+        let object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.api.encode(request)) as? [String: Any])
+        #expect(Set(object.keys) == ["firstName", "lastName", "nickname"])
+        #expect(object["nickname"] is NSNull)
+    }
+
+    @Test func friendAccessOmitsUnchangedFields() throws {
+        let object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.api.encode(FriendAccess(canSeeNotes: false))) as? [String: Any])
+        #expect(Set(object.keys) == ["canSeeNotes"])
+    }
+
+    @Test func newRoutesMatchSpec() throws {
+        let userId = UUID(uuidString: "7F1B7C4E-8A0E-4C55-9D0E-0B6C2A1D9F11")!
+        let friendId = UUID(uuidString: "7F1B7C4E-8A0E-4C55-9D0E-0B6C2A1D9F13")!
+        let base = "users/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11"
+
+        let update = try Endpoint.updateUser(UpdateUserRequest(firstName: "A", lastName: "B"), for: userId)
+        #expect(update.method == .patch && update.path == base)
+        let saved = try Endpoint.replaceSavedActivities(ReplaceSavedActivitiesRequest(activityIds: []), for: userId)
+        #expect(saved.method == .put && saved.path == "\(base)/saved-activities")
+        let friend = try Endpoint.updateFriend(friendId, access: FriendAccess(canSeeLocation: true), for: userId)
+        #expect(friend.method == .patch && friend.path == "\(base)/friends/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f13")
+        #expect(Endpoint.removeFriend(friendId, for: userId).method == .delete)
+        #expect(Endpoint.connectGoogleCalendar(for: userId).path == "\(base)/google-calendar")
+        #expect(try Endpoint.searchUsers(SearchUsersRequest(email: "a@b.co")).path == "users/search")
     }
 
     @Test func routesMatchSpec() {

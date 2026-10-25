@@ -84,6 +84,18 @@ export const activities = pgTable("activities", {
   ],
 );
 
+// The activities a user does often, picked at sign-up; the app's status drop-down lists these.
+export const userActivities = pgTable("user_activities", {
+    userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+    activityId: uuid().notNull().references(() => activities.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.activityId] }),
+    index().on(t.activityId),
+  ],
+);
+
 export const activityTriggers = pgTable("activity_triggers", {
     id: uuid().primaryKey().defaultRandom(),
     activityId: uuid().notNull().references(() => activities.id, { onDelete: "cascade" }),

@@ -6,6 +6,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>APIKey</key>
 	<string>$(API_KEY)</string>
+	<key>CalendarCallbackScheme</key>
+	<string>impromptu</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Impromptu uses your location to find people within a mile doing the same thing as you. Your exact location is never shown to anyone.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -86,18 +86,6 @@ struct StatusLine: View {
     }
 }
 
-extension Color {
-    static let feedBackground = Color(uiColor: .systemGroupedBackground)
-    static let cardFill = Color(uiColor: .secondarySystemGroupedBackground)
-}
-
-extension View {
-    /// The rounded card used across the home feed.
-    func cardBackground() -> some View {
-        background(Color.cardFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-
 #Preview {
     ScrollView {
         VStack(spacing: 12) {
@@ -111,5 +99,5 @@ extension View {
         }
         .padding()
     }
-    .background(Color.feedBackground)
+    .background(Color.appBackground)
 }

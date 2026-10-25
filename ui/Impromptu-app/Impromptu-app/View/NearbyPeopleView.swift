@@ -116,14 +116,14 @@ struct NearbyPeopleView: View {
                 Group {
                     if viewModel.isSending {
                         ProgressView()
+                            .tint(Color.onBrandAccent)
                     } else {
                         Text(viewModel.selection.isEmpty ? "Select people to ask" : "Ask for a note (\(viewModel.selection.count))")
                     }
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.brand)
             .disabled(!viewModel.canSend)
         }
         .padding()

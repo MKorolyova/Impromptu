@@ -194,6 +194,27 @@ paths:
                 properties: { user: { $ref: "#/components/schemas/User" } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      summary: Change the user's name or nickname
+      description: Send only the fields that change. A null `nickname` removes it.
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       summary: Soft-delete a user
       description: The user is no longer returned, and their email can be used for a new account.
@@ -271,6 +292,153 @@ paths:
         "204": { description: Deleted }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/saved-activities:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: The activities the user picked as their own
+      description: |
+        Picked at sign-up; the app's status drop-down lists these. Same order as `GET /users/{userId}/activities`.
+        Deleted custom activities drop out. Empty for users who never picked any.
+      operationId: listSavedActivities
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activities]
+                properties:
+                  activities:
+                    type: array
+                    items: { $ref: "#/components/schemas/Activity" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Replace the user's picked activities
+      description: Every id must be a standard activity or one of the user's own, or nothing is saved.
+      operationId: replaceSavedActivities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activityIds]
+              properties:
+                activityIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string, format: uuid }
+                  description: Duplicates are ignored.
+      responses:
+        "200":
+          description: The saved activities.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activities]
+                properties:
+                  activities:
+                    type: array
+                    items: { $ref: "#/components/schemas/Activity" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/friends:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: People the user added, and what each can see
+      description: |
+        One-way: adding someone lets them see what the user allows; it doesn't let the user see theirs.
+        Sorted by name. Sharing isn't applied to the feed yet; these are the user's choices.
+      operationId: listFriends
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [friends]
+                properties:
+                  friends:
+                    type: array
+                    items: { $ref: "#/components/schemas/Friend" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add a friend by email, or change what they can see
+      description: |
+        Exact email match, ignoring capitals. If they're already a friend, only the access fields sent change.
+        Someone new can see nothing unless the request says so.
+      operationId: addFriend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                canSeeLocation: { type: boolean }
+                canSeeNotes: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [friend]
+                properties: { friend: { $ref: "#/components/schemas/Friend" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: The user doesn't exist, or no one has that email.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /users/{userId}/friends/{friendId}:
+    parameters:
+      - { $ref: "#/components/parameters/userId" }
+      - { $ref: "#/components/parameters/friendId" }
+    patch:
+      summary: Change what a friend can see
+      operationId: updateFriend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                canSeeLocation: { type: boolean }
+                canSeeNotes: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [friend]
+                properties: { friend: { $ref: "#/components/schemas/Friend" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Remove a friend
+      operationId: removeFriend
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /users/{userId}/statuses:
@@ -621,6 +789,7 @@ components:
     activityId: { name: activityId, in: path, required: true, schema: { type: string, format: uuid } }
     statusId: { name: statusId, in: path, required: true, schema: { type: string, format: uuid } }
     requestId: { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
+    friendId: { name: friendId, in: path, required: true, schema: { type: string, format: uuid } }
 
   schemas:
     CreateUserRequest:
@@ -633,6 +802,25 @@ components:
         lastName: { type: string, minLength: 1, maxLength: 100 }
         nickname: { type: [string, "null"], minLength: 1, maxLength: 50 }
         timezone: { type: string, description: IANA name, e.g. America/Chicago. }
+
+    UpdateUserRequest:
+      type: object
+      minProperties: 1
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        nickname: { type: [string, "null"], minLength: 1, maxLength: 50 }
+
+    Friend:
+      type: object
+      required: [id, firstName, lastName, nickname, canSeeLocation, canSeeNotes]
+      properties:
+        id: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        nickname: { type: [string, "null"] }
+        canSeeLocation: { type: boolean, description: The user lets this friend see their location. }
+        canSeeNotes: { type: boolean, description: The user lets this friend see their status notes. }
 
     LoginRequest:
       type: object

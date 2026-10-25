@@ -5,174 +5,157 @@
 
 import SwiftUI
 
-/// Your account at the top of the feed. Tapping it drops down a composer for your status.
+/// Top of the home screen: who you are, your status in the widget's design, and the composer.
 struct MyStatusCard: View {
     @Bindable var viewModel: HomeViewModel
-    let onBrowseActivities: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            if viewModel.isComposerOpen {
-                Divider().padding(.horizontal)
-                StatusComposer(viewModel: viewModel, onBrowseActivities: onBrowseActivities)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .cardBackground()
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    private var header: some View {
-        Button {
-            withAnimation(.snappy) { viewModel.toggleComposer() }
-        } label: {
-            HStack(spacing: 12) {
-                AvatarView(id: viewModel.user.id, firstName: viewModel.user.firstName, lastName: viewModel.user.lastName,
-                           size: 52, isActive: viewModel.activeMyStatus != nil)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(viewModel.user.firstName) \(viewModel.user.lastName)")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    if let status = viewModel.activeMyStatus {
-                        StatusLine(status: status)
-                        Group {
-                            if let note = status.note {
-                                Text("\(note) · until \(status.expiresAt, style: .time)")
-                            } else {
-                                Text("until \(status.expiresAt, style: .time)")
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    } else {
-                        Text("What are you up to?")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.down")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(viewModel.isComposerOpen ? 180 : 0))
-            }
-            .padding()
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(viewModel.isComposerOpen ? "Closes the status editor" : "Opens the status editor")
-    }
-}
-
-/// The drop-down: activity chips, note, duration, and update/clear.
-private struct StatusComposer: View {
-    @Bindable var viewModel: HomeViewModel
+    /// Opens every activity, searchable, to pick one outside your saved list.
     let onBrowseActivities: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Activity")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(viewModel.suggestedActivities) { activity in
-                            ActivityChip(activity: activity, isSelected: viewModel.draft.activity == activity) {
-                                viewModel.draft.activity = activity
-                            }
-                        }
-                        Button("More", systemImage: "ellipsis", action: onBrowseActivities)
-                            .font(.subheadline.weight(.medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.secondary.opacity(0.12), in: Capsule())
-                            .buttonStyle(.plain)
-                    }
-                    .padding(.vertical, 2)
-                }
-                .scrollClipDisabled()
-            }
-
-            TextField("Add a note (optional)", text: $viewModel.draft.note, axis: .vertical)
-                .lineLimit(1...3)
-                .padding(12)
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            HStack {
-                Text("For")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("Duration", selection: $viewModel.draft.durationMinutes) {
-                    ForEach(StatusDraft.durationOptions, id: \.self) { minutes in
-                        Text(durationLabel(minutes)).tag(minutes)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-            .font(.subheadline)
-
-            HStack(spacing: 12) {
-                if viewModel.activeMyStatus != nil {
-                    Button("Clear", role: .destructive) {
-                        Task { await viewModel.clearStatus() }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                Button {
-                    Task { await viewModel.publishDraft() }
-                } label: {
-                    Group {
-                        if viewModel.isUpdatingStatus {
-                            ProgressView()
-                        } else {
-                            Text(viewModel.activeMyStatus == nil ? "Post Status" : "Update Status")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.canPublishDraft)
-            }
-            .controlSize(.large)
+            header
+            StatusCard(status: viewModel.activeMyStatus.map { StatusSnapshot($0) }, timezone: viewModel.user.timezone)
+                .frame(height: 112)
+            Divider()
+            StatusComposer(viewModel: viewModel, onBrowseActivities: onBrowseActivities)
         }
-        .padding()
+        .padding(16)
+        .cardBackground()
     }
 
-    private func durationLabel(_ minutes: Int?) -> String {
-        guard let minutes else {
-            guard let activity = viewModel.draft.activity else { return "Default" }
-            return "Default (\(formatted(activity.defaultDurationMinutes)))"
+    private var header: some View {
+        HStack(spacing: 14) {
+            AvatarView(id: viewModel.user.id, firstName: viewModel.user.firstName, lastName: viewModel.user.lastName,
+                       size: 64, isActive: viewModel.activeMyStatus != nil, usesBrandColors: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.user.displayName)
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Group {
+                    if let status = viewModel.activeMyStatus {
+                        Text("Sharing since \(status.startedAt, style: .time)")
+                    } else {
+                        Text("Not sharing a status")
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
         }
-        return formatted(minutes)
-    }
-
-    private func formatted(_ minutes: Int) -> String {
-        Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        .accessibilityElement(children: .combine)
     }
 }
 
-private struct ActivityChip: View {
-    let activity: Activity
-    let isSelected: Bool
-    let action: () -> Void
+/// Note first, then the activity drop-down, then Update Status.
+private struct StatusComposer: View {
+    @Bindable var viewModel: HomeViewModel
+    let onBrowseActivities: () -> Void
+
+    private var isNoteTooLong: Bool {
+        viewModel.draft.note.count > StatusDraft.maxNoteLength
+    }
 
     var body: some View {
-        Button(action: action) {
-            Label(activity.name, systemImage: ActivitySymbol.name(for: activity.name))
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.12), in: Capsule())
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Update your status")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                TextField("Add a note (optional)", text: $viewModel.draft.note, axis: .vertical)
+                    .lineLimit(1...4)
+                    .brandField()
+                if viewModel.draft.note.count > StatusDraft.maxNoteLength - 40 {
+                    Text("\(viewModel.draft.note.count)/\(StatusDraft.maxNoteLength)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(isNoteTooLong ? Color.red : Color.secondary)
+                }
+            }
+
+            activityMenu
+
+            Button {
+                Task { await viewModel.publishDraft() }
+            } label: {
+                if viewModel.isUpdatingStatus {
+                    ProgressView()
+                        .tint(Color.onBrandAccent)
+                } else {
+                    Text("Update Status")
+                }
+            }
+            .buttonStyle(.brand)
+            .disabled(!viewModel.canPublishDraft)
+
+            footer
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var activityMenu: some View {
+        Menu {
+            Picker("Activity", selection: $viewModel.draft.activity) {
+                ForEach(viewModel.myActivities) { activity in
+                    Label(activity.name, systemImage: ActivitySymbol.name(for: activity.name))
+                        .tag(Optional(activity))
+                }
+            }
+            Divider()
+            Button("More Activities…", systemImage: "magnifyingglass", action: onBrowseActivities)
+        } label: {
+            HStack(spacing: 12) {
+                if let activity = viewModel.draft.activity {
+                    ActivityIcon(activityName: activity.name, size: 34)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activity.name)
+                            .font(.body.weight(.semibold))
+                        Text("Until about \(Date.now.addingTimeInterval(activity.defaultDuration), style: .time)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Image(systemName: "square.grid.2x2")
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(.secondary)
+                    Text("Choose an activity")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .insetBackground()
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Activity")
+        .accessibilityValue(viewModel.draft.activity?.name ?? "None")
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        if viewModel.showsUpdateConfirmation {
+            Label("Status updated. Friends can see it now.", systemImage: "checkmark.circle.fill")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Color.brandAccent)
+                .frame(maxWidth: .infinity)
+                .transition(.opacity)
+                .task {
+                    try? await Task.sleep(for: .seconds(3))
+                    withAnimation { viewModel.dismissUpdateConfirmation() }
+                }
+        } else if viewModel.activeMyStatus != nil {
+            Button("Clear Status", role: .destructive) {
+                Task { await viewModel.clearStatus() }
+            }
+            .font(.footnote.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .disabled(viewModel.isUpdatingStatus)
+        }
     }
 }
 
@@ -182,6 +165,6 @@ private struct ActivityChip: View {
         MyStatusCard(viewModel: viewModel, onBrowseActivities: {})
             .padding()
     }
-    .background(Color.feedBackground)
+    .background(Color.appBackground)
     .task { await viewModel.load() }
 }

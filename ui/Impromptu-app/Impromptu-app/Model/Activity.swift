@@ -37,3 +37,8 @@ struct CreateActivityRequest: Encodable {
     var name: String
     var defaultDurationMinutes: Int
 }
+
+/// Body of `PUT /users/{userId}/saved-activities`.
+struct ReplaceSavedActivitiesRequest: Encodable {
+    var activityIds: [UUID]
+}

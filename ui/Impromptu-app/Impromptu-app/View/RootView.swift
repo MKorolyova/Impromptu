@@ -13,6 +13,8 @@ struct RootView: View {
         switch session.state {
         case .restoring:
             ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.appBackground)
                 .task { await session.restore() }
         case .restoreFailed(let message):
             ContentUnavailableView {
@@ -24,7 +26,7 @@ struct RootView: View {
                 Button("Sign Out", role: .destructive, action: session.signOut)
             }
         case .signedOut:
-            LoginView()
+            WelcomeView()
         case .signedIn(let user):
             HomeView(user: user, services: services)
                 .id(user.id)

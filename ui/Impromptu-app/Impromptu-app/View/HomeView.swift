@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// The feed: your account and status drop-down on top, then everyone else's statuses.
+/// The feed: you and your status composer on top, then everyone else's statuses.
 struct HomeView: View {
     private enum Sheet: Identifiable {
         case activities
@@ -16,15 +16,19 @@ struct HomeView: View {
     }
 
     @Environment(SessionViewModel.self) private var session
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppTheme.storageKey, store: AppTheme.store) private var theme: AppTheme = .system
     @State private var viewModel: HomeViewModel
     @State private var sheet: Sheet?
-    @State private var isConfirmingDelete = false
+    @State private var isShowingSettings = false
+    private let user: User
     private let services: Services
 
     private static let refreshInterval: Duration = .seconds(60)
 
     init(user: User, services: Services) {
         _viewModel = State(initialValue: HomeViewModel(user: user, services: services))
+        self.user = user
         self.services = services
     }
 
@@ -44,16 +48,22 @@ struct HomeView: View {
                 .padding(.horizontal)
                 .padding(.bottom)
             }
-            .background(Color.feedBackground)
-            .navigationTitle("Impromptu")
+            .background(Color.appBackground)
+            .navigationTitle(Brand.appName)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     notesButton
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    accountMenu
+                    profileMenu
                 }
             }
+            .navigationDestination(isPresented: $isShowingSettings) {
+                SettingsView(user: viewModel.user, services: services)
+            }
+            // Settings can rename you.
+            .onChange(of: user) { _, user in viewModel.userDidChange(user) }
             .refreshable { await viewModel.load() }
             .task {
                 await viewModel.load()
@@ -91,19 +101,6 @@ struct HomeView: View {
                 case .nearbyPeople: .nearbyPeople
                 case .notes: .notes
                 }
-            }
-            .confirmationDialog("Delete your account?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                Button("Delete Account", role: .destructive) {
-                    Task {
-                        do {
-                            try await session.deleteAccount()
-                        } catch {
-                            viewModel.errorMessage = error.localizedDescription
-                        }
-                    }
-                }
-            } message: {
-                Text("Your statuses and custom activities will no longer be visible.")
             }
             .alert("Something went wrong", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -192,17 +189,26 @@ struct HomeView: View {
         }
     }
 
-    private var accountMenu: some View {
+    /// Top right: settings, light/dark, and log out.
+    private var profileMenu: some View {
         Menu {
             Section(viewModel.user.email) {
-                Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", action: session.signOut)
+                Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                Button(isDark ? "Light Mode" : "Dark Mode", systemImage: isDark ? "sun.max" : "moon", action: toggleTheme)
             }
-            Button("Delete Account", systemImage: "trash", role: .destructive) {
-                isConfirmingDelete = true
-            }
+            Button("Log Out", systemImage: "rectangle.portrait.and.arrow.right", action: session.signOut)
         } label: {
-            Label("Account", systemImage: "person.crop.circle")
+            AvatarView(id: viewModel.user.id, firstName: viewModel.user.firstName, lastName: viewModel.user.lastName,
+                       size: 32, usesBrandColors: true)
         }
+        .accessibilityLabel("Profile")
+    }
+
+    private var isDark: Bool { colorScheme == .dark }
+
+    private func toggleTheme() {
+        theme = isDark ? .light : .dark
+        viewModel.appearanceDidChange()
     }
 }
 

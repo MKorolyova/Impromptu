@@ -33,6 +33,17 @@ final class MockAccountService: AccountServicing {
         return user
     }
 
+    func isEmailRegistered(_ email: String) async throws -> Bool {
+        email.caseInsensitiveCompare(user.email) == .orderedSame
+    }
+
+    func updateProfile(_ request: UpdateUserRequest, for userId: UUID) async throws -> User {
+        user.firstName = request.firstName
+        user.lastName = request.lastName
+        user.nickname = request.nickname
+        return user
+    }
+
     func restoreUser(_ userId: UUID) async throws -> User {
         guard userId == user.id else { throw APIError.http(statusCode: 404, code: .notFound, message: "User not found") }
         return user
@@ -49,6 +60,7 @@ final class MockAccountService: AccountServicing {
 
 final class MockActivityService: ActivityServicing {
     var activities = SampleData.activities
+    var savedIds: [UUID] = Array(SampleData.activities.prefix(5).map(\.id))
 
     func fetchActivities(for userId: UUID) async throws -> [Activity] {
         activities
@@ -64,6 +76,84 @@ final class MockActivityService: ActivityServicing {
     func deleteActivity(_ activity: Activity, for userId: UUID) async throws {
         activities.removeAll { $0.id == activity.id }
     }
+
+    func fetchSavedActivities(for userId: UUID) async throws -> [Activity] {
+        activities.filter { savedIds.contains($0.id) }
+    }
+
+    func saveActivities(_ activityIds: [UUID], for userId: UUID) async throws -> [Activity] {
+        savedIds = activityIds
+        return try await fetchSavedActivities(for: userId)
+    }
+}
+
+final class MockFriendService: FriendServicing {
+    var friends: [Friend] = [
+        Friend(id: SampleData.people[0].id, firstName: "Sam", lastName: "Lee", nickname: nil, canSeeLocation: true, canSeeNotes: true),
+        Friend(id: SampleData.people[1].id, firstName: "Jordan", lastName: "Park", nickname: "Jo", canSeeLocation: false, canSeeNotes: true),
+    ]
+    /// Emails `addFriend` recognizes.
+    var directory: [String: Friend] = [
+        "priya@example.com": Friend(id: SampleData.people[2].id, firstName: "Priya", lastName: "Shah", nickname: nil,
+                                    canSeeLocation: false, canSeeNotes: false),
+    ]
+
+    func fetchFriends(for userId: UUID) async throws -> [Friend] { friends }
+
+    func addFriend(email: String, access: FriendAccess, for userId: UUID) async throws -> Friend {
+        guard var friend = directory[email.lowercased()] else {
+            throw APIError.http(statusCode: 404, code: .notFound, message: "No one on Impromptu uses that email")
+        }
+        if let existing = friends.first(where: { $0.id == friend.id }) { friend = existing }
+        friend.apply(access)
+        upsert(friend)
+        return friend
+    }
+
+    func updateFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend {
+        guard var friend = friends.first(where: { $0.id == friendId }) else {
+            throw APIError.http(statusCode: 404, code: .notFound, message: "Friend not found")
+        }
+        friend.apply(access)
+        upsert(friend)
+        return friend
+    }
+
+    func removeFriend(_ friendId: UUID, for userId: UUID) async throws {
+        friends.removeAll { $0.id == friendId }
+    }
+
+    private func upsert(_ friend: Friend) {
+        if let index = friends.firstIndex(where: { $0.id == friend.id }) {
+            friends[index] = friend
+        } else {
+            friends.append(friend)
+        }
+    }
+}
+
+private extension Friend {
+    mutating func apply(_ access: FriendAccess) {
+        if let canSeeLocation = access.canSeeLocation { self.canSeeLocation = canSeeLocation }
+        if let canSeeNotes = access.canSeeNotes { self.canSeeNotes = canSeeNotes }
+    }
+}
+
+final class MockCalendarService: CalendarServicing {
+    var isConnected = false
+
+    func isGoogleCalendarConnected(for userId: UUID) async throws -> Bool { isConnected }
+
+    func startGoogleCalendarConnection(for userId: UUID) async throws -> CalendarConnection {
+        CalendarConnection(authURL: URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!, callbackScheme: "impromptu")
+    }
+}
+
+final class MockStatusPreferencesStore: StatusPreferencesStoring {
+    private(set) var saved: [UUID: Set<StatusSource>] = [:]
+
+    func sources(for userId: UUID) -> Set<StatusSource> { saved[userId] ?? [.manual] }
+    func save(_ sources: Set<StatusSource>, for userId: UUID) { saved[userId] = sources }
 }
 
 final class MockStatusService: StatusServicing {
@@ -234,5 +324,11 @@ final class MockWidgetSyncService: WidgetSyncing {
     func clear() {
         lastStatus = nil
         lastPeople = []
+    }
+
+    private(set) var appearanceReloads = 0
+
+    func reloadAppearance() {
+        appearanceReloads += 1
     }
 }

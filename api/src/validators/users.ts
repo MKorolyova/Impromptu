@@ -27,6 +27,16 @@ export const createUserRequestSchema = createUserSchema
   .omit({ passwordHash: true })
   .extend({ password: z.string().min(8, "Password must be at least 8 characters").max(128) });
 
+// Body of PATCH /api/v1/users/{userId}. Send only what changes; a null nickname removes it.
+export const updateUserRequestSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(100),
+    lastName: z.string().trim().min(1).max(100),
+    nickname: z.string().trim().min(1).max(50).nullable(),
+  })
+  .partial()
+  .refine((body) => Object.keys(body).length > 0, "Send firstName, lastName or nickname");
+
 // Body of POST /api/v1/users/search. The email goes in the body, never the URL.
 export const searchUsersRequestSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
@@ -47,4 +57,5 @@ export const loginRequestSchema = z.object({
 export type User = z.infer<typeof userSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
+export type UpdateUserRequest = z.infer<typeof updateUserRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;

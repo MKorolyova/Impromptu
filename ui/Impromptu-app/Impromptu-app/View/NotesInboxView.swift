@@ -107,7 +107,7 @@ private struct NoteRequestRow: View {
             case (.incoming, .pending) where request.isOpen:
                 HStack {
                     Button("Reply", systemImage: "arrowshape.turn.up.left.fill", action: onReply)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.brand(.primary, compact: true))
                     Button("Decline", role: .destructive, action: onDecline)
                         .buttonStyle(.bordered)
                 }

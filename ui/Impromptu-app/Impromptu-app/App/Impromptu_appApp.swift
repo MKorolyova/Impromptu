@@ -11,6 +11,8 @@ import SwiftUI
 struct Impromptu_appApp: App {
     private let services: Services
     @State private var session: SessionViewModel
+    /// Toggled from the profile menu; nil follows the system.
+    @AppStorage(AppTheme.storageKey, store: AppTheme.store) private var theme: AppTheme = .system
 
     init() {
         let services = Services.live()
@@ -26,6 +28,7 @@ struct Impromptu_appApp: App {
             RootView()
                 .environment(\.services, services)
                 .environment(session)
+                .preferredColorScheme(theme.colorScheme)
         }
         .backgroundTask(.appRefresh(NearbyAlertsService.backgroundTaskIdentifier)) {
             [nearbyAlerts = services.nearbyAlerts, noteMonitor = services.noteMonitor] in

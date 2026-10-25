@@ -11,6 +11,9 @@ protocol AccountServicing {
     var storedUserId: UUID? { get }
     func logIn(email: String, password: String) async throws -> User
     func createAccount(_ request: CreateUserRequest) async throws -> User
+    /// Lets sign-up catch a taken email before asking for anything else.
+    func isEmailRegistered(_ email: String) async throws -> Bool
+    func updateProfile(_ request: UpdateUserRequest, for userId: UUID) async throws -> User
     /// Reloads the remembered user on launch.
     func restoreUser(_ userId: UUID) async throws -> User
     func signOut()
@@ -19,6 +22,10 @@ protocol AccountServicing {
 
 private struct UserEnvelope: Decodable {
     var user: User
+}
+
+private struct UsersEnvelope: Decodable {
+    var users: [User]
 }
 
 final class AccountService: AccountServicing {
@@ -45,6 +52,16 @@ final class AccountService: AccountServicing {
     func createAccount(_ request: CreateUserRequest) async throws -> User {
         let envelope: UserEnvelope = try await client.send(.createUser(request))
         storedUserId = envelope.user.id
+        return envelope.user
+    }
+
+    func isEmailRegistered(_ email: String) async throws -> Bool {
+        let envelope: UsersEnvelope = try await client.send(.searchUsers(SearchUsersRequest(email: email)))
+        return !envelope.users.isEmpty
+    }
+
+    func updateProfile(_ request: UpdateUserRequest, for userId: UUID) async throws -> User {
+        let envelope: UserEnvelope = try await client.send(.updateUser(request, for: userId))
         return envelope.user
     }
 

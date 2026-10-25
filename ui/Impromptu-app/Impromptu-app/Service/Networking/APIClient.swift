@@ -19,6 +19,9 @@ enum APIConfig {
     /// The server's shared `API_KEY`, if it has one. Nil sends no `Authorization` header.
     static let apiKey: String? = infoValue("APIKey")
 
+    /// Scheme of the server's `APP_REDIRECT_URL`, where Google Calendar sign-in returns to the app.
+    static let calendarCallbackScheme: String = infoValue("CalendarCallbackScheme") ?? "impromptu"
+
     private static func infoValue(_ key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
               !value.isEmpty else { return nil }

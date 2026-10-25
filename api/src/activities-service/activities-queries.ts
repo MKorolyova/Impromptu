@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
-import { db } from "@/db/index";
-import { activities } from "@/db/schema";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { db, withTransaction } from "@/db/index";
+import { activities, userActivities } from "@/db/schema";
 import type { CreateCustomActivityRequest } from "@/validators/activities";
 
 const activityColumns = {
@@ -81,4 +81,31 @@ export async function getStandardActivityByName(name: string): Promise<PublicAct
     .where(and(isStandard, eq(activities.name, name)))
     .limit(1);
   return activity ?? null;
+}
+
+// The activities the user picked as their own, in the same order as listActivitiesForUser.
+// Deleted custom activities drop out.
+export function listSavedActivities(userId: string): Promise<PublicActivity[]> {
+  return db
+    .select(activityColumns)
+    .from(userActivities)
+    .innerJoin(activities, eq(userActivities.activityId, activities.id))
+    .where(and(eq(userActivities.userId, userId), isVisibleTo(userId)))
+    .orderBy(desc(activities.isCustom), asc(activities.name));
+}
+
+// Replaces the user's picked activities. Returns false, saving nothing, if any id isn't a standard
+// activity or one of the user's own.
+export function replaceSavedActivities(userId: string, activityIds: string[]): Promise<boolean> {
+  return withTransaction(async (tx) => {
+    const visible = await tx
+      .select({ id: activities.id })
+      .from(activities)
+      .where(and(inArray(activities.id, activityIds), isVisibleTo(userId)));
+    if (visible.length !== activityIds.length) return false;
+
+    await tx.delete(userActivities).where(eq(userActivities.userId, userId));
+    await tx.insert(userActivities).values(activityIds.map((activityId) => ({ userId, activityId })));
+    return true;
+  });
 }

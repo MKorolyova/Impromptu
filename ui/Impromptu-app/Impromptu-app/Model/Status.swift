@@ -6,11 +6,13 @@
 import Foundation
 
 /// `status_source` in api/src/db/schema.ts.
-enum StatusSource: String, Codable {
+enum StatusSource: String, Codable, CaseIterable, Identifiable {
     case manual = "MANUAL"
     case calendar = "CALENDAR"
     case location = "LOCATION"
     case automated = "AUTOMATED"
+
+    var id: Self { self }
 }
 
 /// `Status` in api/openapi.yaml.

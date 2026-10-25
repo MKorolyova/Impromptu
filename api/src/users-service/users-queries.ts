@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/index";
 import { users } from "@/db/schema";
-import type { CreateUserInput } from "@/validators/users";
+import type { CreateUserInput, UpdateUserRequest } from "@/validators/users";
 
 // Every column except passwordHash and deletedAt; safe to return from the API.
 const publicUserColumns = {
@@ -106,6 +106,12 @@ export function getUserProfilesByIds(userIds: string[]): Promise<UserProfile[]> 
     .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, nickname: users.nickname })
     .from(users)
     .where(and(inArray(users.id, userIds), isNull(users.deletedAt)));
+}
+
+// Returns null when the user doesn't exist or was deleted.
+export async function updateUserProfile(userId: string, input: UpdateUserRequest): Promise<PublicUser | null> {
+  const [user] = await db.update(users).set(input).where(isActiveUser(userId)).returning(publicUserColumns);
+  return user ?? null;
 }
 
 // Returns false when the user doesn't exist or was already deleted.

@@ -14,8 +14,13 @@ struct User: Codable, Identifiable, Hashable {
     var nickname: String?
     var timezone: String
 
+    /// The nickname if there is one, otherwise the full name.
     var displayName: String {
-        nickname ?? firstName
+        nickname ?? fullName
+    }
+
+    var fullName: String {
+        "\(firstName) \(lastName)"
     }
 }
 
@@ -33,4 +38,28 @@ struct CreateUserRequest: Encodable {
     var lastName: String
     var nickname: String?
     var timezone: String = TimeZone.current.identifier
+}
+
+/// Body of `PATCH /users/{userId}`.
+struct UpdateUserRequest: Encodable {
+    var firstName: String
+    var lastName: String
+    /// Nil removes the nickname, so it's always sent.
+    var nickname: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case firstName, lastName, nickname
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(firstName, forKey: .firstName)
+        try container.encode(lastName, forKey: .lastName)
+        try container.encode(nickname, forKey: .nickname)
+    }
+}
+
+/// Body of `POST /users/search`.
+struct SearchUsersRequest: Encodable {
+    var email: String
 }

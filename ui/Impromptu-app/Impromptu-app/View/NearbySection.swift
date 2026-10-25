@@ -111,6 +111,6 @@ private struct NoticeView: View {
         NearbySection(viewModel: viewModel, onShowPeople: {})
             .padding()
     }
-    .background(Color.feedBackground)
+    .background(Color.appBackground)
     .task { await viewModel.load() }
 }

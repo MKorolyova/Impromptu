@@ -32,6 +32,10 @@ struct Endpoint {
         Endpoint(method: .put, path: path, body: try JSONEncoder.api.encode(body))
     }
 
+    static func patch(_ path: String, body: some Encodable) throws -> Endpoint {
+        Endpoint(method: .patch, path: path, body: try JSONEncoder.api.encode(body))
+    }
+
     static func delete(_ path: String) -> Endpoint {
         Endpoint(method: .delete, path: path)
     }
@@ -47,6 +51,10 @@ extension Endpoint {
 
     static func createUser(_ request: CreateUserRequest) throws -> Endpoint {
         try post("users", body: request)
+    }
+
+    static func searchUsers(_ request: SearchUsersRequest) throws -> Endpoint {
+        try post("users/search", body: request)
     }
 
     static let people = get("feed")
@@ -83,8 +91,44 @@ extension Endpoint {
         get(userPath(userId))
     }
 
+    static func updateUser(_ request: UpdateUserRequest, for userId: UUID) throws -> Endpoint {
+        try patch(userPath(userId), body: request)
+    }
+
     static func deleteUser(_ userId: UUID) -> Endpoint {
         delete(userPath(userId))
+    }
+
+    static func savedActivities(for userId: UUID) -> Endpoint {
+        get("\(userPath(userId))/saved-activities")
+    }
+
+    static func replaceSavedActivities(_ request: ReplaceSavedActivitiesRequest, for userId: UUID) throws -> Endpoint {
+        try put("\(userPath(userId))/saved-activities", body: request)
+    }
+
+    static func friends(for userId: UUID) -> Endpoint {
+        get("\(userPath(userId))/friends")
+    }
+
+    static func addFriend(_ request: AddFriendRequest, for userId: UUID) throws -> Endpoint {
+        try post("\(userPath(userId))/friends", body: request)
+    }
+
+    static func updateFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) throws -> Endpoint {
+        try patch("\(userPath(userId))/friends/\(friendId.pathComponent)", body: access)
+    }
+
+    static func removeFriend(_ friendId: UUID, for userId: UUID) -> Endpoint {
+        delete("\(userPath(userId))/friends/\(friendId.pathComponent)")
+    }
+
+    static func googleCalendar(for userId: UUID) -> Endpoint {
+        get("\(userPath(userId))/google-calendar")
+    }
+
+    static func connectGoogleCalendar(for userId: UUID) -> Endpoint {
+        Endpoint(method: .post, path: "\(userPath(userId))/google-calendar")
     }
 
     static func activities(for userId: UUID) -> Endpoint {

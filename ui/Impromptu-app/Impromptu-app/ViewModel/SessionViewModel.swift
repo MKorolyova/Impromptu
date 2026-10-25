@@ -56,8 +56,16 @@ final class SessionViewModel {
         state = .signedIn(try await account.logIn(email: email, password: password))
     }
 
-    func createAccount(_ request: CreateUserRequest) async throws {
-        state = .signedIn(try await account.createAccount(request))
+    /// Sign-up creates the account partway through and keeps its sheet up until the last step,
+    /// then hands over here to open the home screen.
+    func completeRegistration(_ user: User) {
+        state = .signedIn(user)
+    }
+
+    /// After a profile edit, so every screen shows the new name.
+    func updateUser(_ user: User) {
+        guard case .signedIn(let current) = state, current.id == user.id else { return }
+        state = .signedIn(user)
     }
 
     func signOut() {

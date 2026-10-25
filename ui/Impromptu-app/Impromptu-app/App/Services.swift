@@ -10,6 +10,9 @@ import SwiftUI
 struct Services {
     let account: AccountServicing
     let activities: ActivityServicing
+    let friends: FriendServicing
+    let calendar: CalendarServicing
+    let statusPreferences: StatusPreferencesStoring
     let statuses: StatusServicing
     let people: PeopleServicing
     let nearbyAlerts: NearbyAlerting
@@ -30,6 +33,9 @@ struct Services {
         return Services(
             account: account,
             activities: ActivityService(client: client),
+            friends: FriendService(client: client),
+            calendar: CalendarService(client: client),
+            statusPreferences: StatusPreferencesStore(),
             statuses: StatusService(client: client),
             people: PeopleService(client: client),
             nearbyAlerts: NearbyAlertsService(
@@ -51,6 +57,9 @@ struct Services {
         return Services(
             account: MockAccountService(signedIn: signedIn),
             activities: MockActivityService(),
+            friends: MockFriendService(),
+            calendar: MockCalendarService(),
+            statusPreferences: MockStatusPreferencesStore(),
             statuses: MockStatusService(),
             people: MockPeopleService(),
             nearbyAlerts: MockNearbyAlerts(),

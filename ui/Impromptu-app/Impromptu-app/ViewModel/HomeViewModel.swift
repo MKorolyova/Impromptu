@@ -6,14 +6,11 @@
 import Foundation
 import Observation
 
-/// What the status drop-down is about to publish.
+/// What the status composer is about to publish. It lasts the activity's default length.
 struct StatusDraft: Equatable {
     var activity: Activity?
     var note = ""
-    /// Nil uses the activity's default length.
-    var durationMinutes: Int?
 
-    static let durationOptions: [Int?] = [nil, 15, 30, 60, 120, 240]
     static let maxNoteLength = 280
 
     var trimmedNote: String? {
@@ -40,7 +37,7 @@ enum NearbyNotice: Equatable {
 }
 
 /// The feed of everyone's statuses, plus the signed-in user's own status and the
-/// drop-down that edits it. Status changes are mirrored to the widget.
+/// composer that edits it. Status changes are mirrored to the widget.
 @Observable
 final class HomeViewModel {
     enum LoadState: Equatable {
@@ -55,6 +52,8 @@ final class HomeViewModel {
     /// Everyone except the signed-in user, in the server's order (active statuses first).
     private(set) var people: [Person] = []
     private(set) var activities: [Activity] = []
+    /// The ones picked at sign-up; the composer's drop-down lists these.
+    private(set) var savedActivities: [Activity] = []
     private(set) var isUpdatingStatus = false
     /// People within about a mile doing the same activity as you; nil until fetched or when alerts are off.
     private(set) var nearby: NearbyResult?
@@ -64,11 +63,12 @@ final class HomeViewModel {
     private(set) var nearbyNotice: NearbyNotice?
     /// Note requests waiting on your reply; the inbox badge.
     private(set) var openNoteRequestCount = 0
-    var isComposerOpen = false
     var draft = StatusDraft()
+    /// Briefly true after an update goes through.
+    private(set) var showsUpdateConfirmation = false
     var errorMessage: String?
 
-    let user: User
+    private(set) var user: User
     private let services: Services
 
     init(user: User, services: Services) {
@@ -89,13 +89,14 @@ final class HomeViewModel {
         people.filter { $0.activeStatus == nil }
     }
 
-    /// Chips shown in the drop-down: the first few activities, plus the drafted one if it's further down.
-    var suggestedActivities: [Activity] {
-        var suggestions = Array(activities.prefix(8))
-        if let selected = draft.activity, !suggestions.contains(selected) {
-            suggestions.insert(selected, at: 0)
+    /// The drop-down's choices: the saved activities (everything for accounts that never picked any),
+    /// plus the drafted one if it came from the full list.
+    var myActivities: [Activity] {
+        var choices = savedActivities.isEmpty ? activities : savedActivities
+        if let selected = draft.activity, !choices.contains(selected) {
+            choices.insert(selected, at: 0)
         }
-        return suggestions
+        return choices
     }
 
     var canPublishDraft: Bool {
@@ -105,15 +106,21 @@ final class HomeViewModel {
     // MARK: Loading
 
     func load() async {
-        if loadState != .loaded { loadState = .loading }
+        let isFirstLoad = loadState != .loaded
+        if isFirstLoad { loadState = .loading }
         do {
             async let status = services.statuses.currentStatus(for: user.id)
             async let people = services.people.fetchPeople()
             async let activities = services.activities.fetchActivities(for: user.id)
+            async let saved = services.activities.fetchSavedActivities(for: user.id)
             let (loadedStatus, loadedPeople, loadedActivities) = try await (status, people, activities)
             myStatus = loadedStatus
             self.people = loadedPeople.filter { $0.id != user.id }
             self.activities = loadedActivities
+            // The drop-down falls back to every activity, so the feed still loads without these.
+            savedActivities = (try? await saved) ?? savedActivities
+            // Later refreshes leave whatever is being typed alone.
+            if isFirstLoad { resetDraft() }
             loadState = .loaded
             syncWidget()
             await refreshNearby()
@@ -128,12 +135,7 @@ final class HomeViewModel {
         }
     }
 
-    // MARK: Status drop-down
-
-    func toggleComposer() {
-        if !isComposerOpen { resetDraft() }
-        isComposerOpen.toggle()
-    }
+    // MARK: Status composer
 
     /// Starts from the current status so "update" means tweak, not retype.
     private func resetDraft() {
@@ -146,11 +148,10 @@ final class HomeViewModel {
 
     func publishDraft() async {
         guard let activity = draft.activity, canPublishDraft else { return }
-        let duration = draft.durationMinutes.map { TimeInterval($0 * 60) }
         let succeeded = await updateStatus {
-            myStatus = try await services.statuses.setStatus(activity: activity, note: draft.trimmedNote, duration: duration, for: user.id)
+            myStatus = try await services.statuses.setStatus(activity: activity, note: draft.trimmedNote, duration: nil, for: user.id)
         }
-        if succeeded { isComposerOpen = false }
+        if succeeded { showsUpdateConfirmation = true }
     }
 
     func clearStatus() async {
@@ -159,7 +160,11 @@ final class HomeViewModel {
             try await services.statuses.clearStatus(myStatus)
             self.myStatus = nil
         }
-        if succeeded { isComposerOpen = false }
+        if succeeded { draft = StatusDraft() }
+    }
+
+    func dismissUpdateConfirmation() {
+        showsUpdateConfirmation = false
     }
 
     private func updateStatus(_ operation: () async throws -> Void) async -> Bool {
@@ -237,10 +242,25 @@ final class HomeViewModel {
         do {
             try await services.activities.deleteActivity(activity, for: user.id)
             activities.removeAll { $0.id == activity.id }
+            savedActivities.removeAll { $0.id == activity.id }
             if draft.activity == activity { draft.activity = nil }
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: Profile and appearance
+
+    /// The name was changed in Settings.
+    func userDidChange(_ user: User) {
+        guard user != self.user else { return }
+        self.user = user
+        syncWidget()
+    }
+
+    /// Light/dark was toggled; the widget follows the app.
+    func appearanceDidChange() {
+        services.widgets.reloadAppearance()
     }
 
     private func syncWidget() {

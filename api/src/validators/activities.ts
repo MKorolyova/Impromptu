@@ -33,6 +33,16 @@ export const createCustomActivityRequestSchema = z.object({
   defaultDurationMinutes: z.int().positive().max(24 * 60),
 });
 
+// Body of PUT /api/v1/users/{userId}/saved-activities. Duplicates are ignored.
+export const replaceSavedActivitiesRequestSchema = z.object({
+  activityIds: z
+    .array(z.uuid())
+    .min(1)
+    .max(200)
+    .transform((ids) => [...new Set(ids.map((id) => id.toLowerCase()))]),
+});
+
 export type Activity = z.infer<typeof activitySchema>;
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 export type CreateCustomActivityRequest = z.infer<typeof createCustomActivityRequestSchema>;
+export type ReplaceSavedActivitiesRequest = z.infer<typeof replaceSavedActivitiesRequestSchema>;

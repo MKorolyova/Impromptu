@@ -13,6 +13,8 @@ struct AvatarView: View {
     var size: CGFloat = 44
     /// Draws a ring when the person has a live status.
     var isActive = false
+    /// Sky initials on indigo, like the status badge. For the signed-in user.
+    var usesBrandColors = false
 
     private static let palette: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .red]
 
@@ -27,13 +29,13 @@ struct AvatarView: View {
     var body: some View {
         Text(initials)
             .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(usesBrandColors ? Brand.sky : .white)
             .frame(width: size, height: size)
-            .background(color.gradient, in: Circle())
+            .background(usesBrandColors ? AnyShapeStyle(Brand.indigo) : AnyShapeStyle(color.gradient), in: Circle())
             .overlay {
                 if isActive {
                     Circle()
-                        .strokeBorder(.green, lineWidth: 2.5)
+                        .strokeBorder(Color.brandAccent, lineWidth: 2.5)
                         .padding(-4)
                 }
             }
@@ -44,6 +46,7 @@ struct AvatarView: View {
 
 #Preview {
     HStack(spacing: 16) {
+        AvatarView(id: UUID(), firstName: "Alex", lastName: "Rivera", size: 64, isActive: true, usesBrandColors: true)
         AvatarView(id: UUID(), firstName: "Sam", lastName: "Lee", isActive: true)
         AvatarView(id: UUID(), firstName: "Jordan", lastName: "Park", size: 56)
         AvatarView(id: UUID(), firstName: "Priya", lastName: "Shah", size: 32)
