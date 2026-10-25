@@ -24,7 +24,7 @@ struct HomeView: View {
     private let user: User
     private let services: Services
 
-    private static let refreshInterval: Duration = .seconds(60)
+    private static let refreshInterval: Duration = .seconds(10)
 
     init(user: User, services: Services) {
         _viewModel = State(initialValue: HomeViewModel(user: user, services: services))
