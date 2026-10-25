@@ -6,13 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env node_modules/.bin/drizzle-kit migrate",
+    "db:seed": "node --env-file=.env src/db/seed.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
+    "drizzle-zod": "^0.8.3",
     "next": "16.4.3",
+    "postgres": "^3.4.9",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20",

@@ -1,4 +1,4 @@
-import type { ActivityDefinition } from "@/types/activity";
+import type { ActivityDefinition } from "../types/activity.ts";
 
 export const ACTIVITIES: readonly ActivityDefinition[] = [
   { name: "Working", defaultDurationMinutes: 120 },
