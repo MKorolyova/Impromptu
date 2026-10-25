@@ -54,7 +54,13 @@ struct WelcomeView: View {
 
     private var hero: some View {
         VStack(spacing: 20) {
-            StatusBadge(symbol: "sparkles", size: 84)
+            Image(.logo)
+                .resizable()
+                .scaledToFit()
+                // The artwork has empty space around the bubbles, so the frame is larger than they look.
+                .frame(width: 150, height: 150)
+                .padding(.bottom, -24)
+                .accessibilityHidden(true)
             Text(Brand.appName)
                 .font(.system(size: 52, weight: .heavy, design: .rounded))
                 .minimumScaleFactor(0.6)
