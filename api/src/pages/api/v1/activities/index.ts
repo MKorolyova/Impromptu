@@ -1,10 +1,10 @@
-import { listStandardActivities } from "@/activities-service/activities-queries";
+import { ACTIVITIES } from "@/constants/activities";
 import { apiRoute } from "@/utils/api-response";
 
 export default apiRoute({
-  // GET /api/v1/activities — every standard activity, by name. Not tied to a user, so the app can
-  // show the list during registration, before the account exists.
+  // GET /api/v1/activities — every standard activity, straight from constants/activities.ts (no
+  // database). Not tied to a user, so the app can show the list during registration.
   async GET(_req, res) {
-    res.status(200).json({ activities: await listStandardActivities() });
+    res.status(200).json({ activities: ACTIVITIES });
   },
 });

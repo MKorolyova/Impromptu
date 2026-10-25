@@ -27,6 +27,17 @@ export const createUserRequestSchema = createUserSchema
   .omit({ passwordHash: true })
   .extend({ password: z.string().min(8, "Password must be at least 8 characters").max(128) });
 
+// Body of POST /api/v1/users/search. The email goes in the body, never the URL.
+export const searchUsersRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email()),
+});
+
+// Query of GET /api/v1/users. `cursor` is the `nextCursor` from the previous page.
+export const listUsersQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+});
+
 export type User = z.infer<typeof userSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;

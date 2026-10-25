@@ -25,9 +25,10 @@ paths:
     get:
       summary: List all standard activities
       description: |
-        Every standard activity, sorted by name, e.g. to let someone choose activities while registering.
-        Not tied to a user, so it works before the account exists. Custom activities are not included;
-        use `GET /users/{userId}/activities` for a user's full list. Empty until the database is seeded.
+        Every standard activity, in the app's curated order, e.g. to let someone choose activities while
+        registering. Served from the built-in list, so it works without a user or a seeded database.
+        These have no ids; use `GET /users/{userId}/activities` for the database rows (with ids) that
+        statuses refer to.
       operationId: listStandardActivities
       responses:
         "200":
@@ -40,10 +41,44 @@ paths:
                 properties:
                   activities:
                     type: array
-                    items: { $ref: "#/components/schemas/Activity" }
+                    items:
+                      type: object
+                      required: [name, defaultDurationMinutes]
+                      properties:
+                        name: { type: string, description: Unique; the same name the database uses. }
+                        defaultDurationMinutes: { type: integer }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /users:
+    get:
+      summary: List all users
+      description: |
+        Users that aren't deleted, oldest first, a page at a time. To get the next page, pass the response's
+        `nextCursor` as `cursor`; `nextCursor` is null on the last page.
+      operationId: listUsers
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          description: The previous page's `nextCursor`.
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users, nextCursor]
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  nextCursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
     post:
       summary: Create a user
       operationId: createUser
@@ -64,6 +99,37 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/search:
+    post:
+      summary: Find a user by email
+      description: |
+        Exact match, ignoring capitals and surrounding spaces. POST so the email stays out of the URL.
+        Returns an empty list when nobody has that email.
+      operationId: searchUsers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users]
+                properties:
+                  users:
+                    type: array
+                    maxItems: 1
+                    items: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /users/{userId}:
     parameters: [{ $ref: "#/components/parameters/userId" }]

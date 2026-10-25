@@ -31,11 +31,6 @@ const isVisibleTo = (userId: string) =>
 
 const isStandard = and(isNull(activities.ownerId), isNull(activities.deletedAt));
 
-// The standard activities everyone can pick, by name. Empty until `pnpm db:seed` has run.
-export function listStandardActivities(): Promise<PublicActivity[]> {
-  return db.select(activityColumns).from(activities).where(isStandard).orderBy(asc(activities.name));
-}
-
 export function listActivitiesForUser(userId: string): Promise<PublicActivity[]> {
   return db
     .select(activityColumns)
