@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/index";
-import { calendarLinks } from "@/db/schema";
+import { calendarLinks, oauthStates, users } from "@/db/schema";
 import type { GoogleChannel } from "@/types/google-channel";
 import { decryptToken, encryptToken } from "@/utils/token-encryption";
 
@@ -94,4 +95,30 @@ export async function clearGoogleChannel(userId: string): Promise<void> {
 
 export async function deleteGoogleCalendarLink(userId: string): Promise<void> {
   await db.delete(calendarLinks).where(isGoogleLinkFor(userId));
+}
+
+export type GoogleCalendarUser = { userId: string; timeZone: string };
+
+// Users with Google Calendar connected whose accounts aren't deleted, with their time zone.
+export function listGoogleCalendarUsers(): Promise<GoogleCalendarUser[]> {
+  return db
+    .select({ userId: calendarLinks.userId, timeZone: users.timezone })
+    .from(calendarLinks)
+    .innerJoin(users, eq(users.id, calendarLinks.userId))
+    .where(and(eq(calendarLinks.provider, GOOGLE), isNull(users.deletedAt)));
+}
+
+const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+
+export async function createOAuthState(userId: string, state: string, expiresAt: Date): Promise<void> {
+  await db.insert(oauthStates).values({ stateHash: sha256(state), userId, expiresAt });
+}
+
+// Single use: the state is deleted as it's read. Returns the user who started connecting.
+export async function consumeOAuthState(state: string): Promise<string | null> {
+  const [row] = await db
+    .delete(oauthStates)
+    .where(and(eq(oauthStates.stateHash, sha256(state)), gt(oauthStates.expiresAt, new Date())))
+    .returning({ userId: oauthStates.userId });
+  return row?.userId ?? null;
 }

@@ -82,10 +82,14 @@ export function parseOrReject<T>(res: NextApiResponse, schema: z.ZodType<T>, inp
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 // One handler per HTTP method, behind the API key, with errors in the standard shape.
-export function apiRoute(handlers: Partial<Record<Method, ApiHandler>>): ApiHandler {
+// `public: true` skips the API key, for callers like Google that can't send it; such routes verify requests themselves.
+export function apiRoute(
+  handlers: Partial<Record<Method, ApiHandler>>,
+  options: { public?: boolean } = {},
+): ApiHandler {
   const allowed = Object.keys(handlers);
   return withApiErrors(async (req, res) => {
-    if (!hasValidApiKey(req)) {
+    if (!options.public && !hasValidApiKey(req)) {
       return sendError(res, "UNAUTHORIZED", "Missing or invalid API key");
     }
     const handler = handlers[req.method as Method];

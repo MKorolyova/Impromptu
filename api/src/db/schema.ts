@@ -102,11 +102,16 @@ export const statuses = pgTable("statuses", {
     source: StatusSource().notNull(),
     startedAt: timestamptz().notNull().defaultNow(),
     expiresAt: timestamptz().notNull(),
+    // Set for CALENDAR statuses: the Google event (instance) this status was created from.
+    googleEventId: text(),
     ...timestamps,
     ...softDelete,
   },
   (t) => [
     index().on(t.userId, t.expiresAt),
+    uniqueIndex("statuses_google_event_unique")
+      .on(t.userId, t.googleEventId)
+      .where(sql`${t.googleEventId} IS NOT NULL AND ${t.deletedAt} IS NULL`),
     check("statuses_expires_after_start", sql`${t.expiresAt} > ${t.startedAt}`),
   ],
 );
@@ -157,6 +162,15 @@ export const calendarLinks = pgTable("calendar_links", {
     uniqueIndex("calendar_links_channel_id_unique").on(t.channelId),
   ],
 );
+
+// One-time OAuth `state` values, so the Google callback knows which user started connecting.
+export const oauthStates = pgTable("oauth_states", {
+  // SHA-256 of the state; the raw value only travels through Google's redirect.
+  stateHash: text().primaryKey(),
+  userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamptz().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
 
 export const conversations = pgTable("conversations", {
     id: uuid().primaryKey().defaultRandom(),

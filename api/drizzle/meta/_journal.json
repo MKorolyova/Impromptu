@@ -22,6 +22,13 @@
       "when": 1792899428703,
       "tag": "0002_soft_delete_activities_statuses",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792905833143,
+      "tag": "0003_calendar_statuses_and_oauth_states",
+      "breakpoints": true
     }
   ]
 }

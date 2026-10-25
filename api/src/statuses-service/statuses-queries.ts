@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "@/db/index";
 import { activities, statuses } from "@/db/schema";
 
@@ -84,4 +84,68 @@ export async function softDeleteStatus(userId: string, statusId: string): Promis
     .where(and(eq(statuses.id, statusId), isUsersStatus(userId)))
     .returning({ id: statuses.id });
   return deleted.length > 0;
+}
+
+export type CalendarStatusInput = {
+  userId: string;
+  activityId: string;
+  googleEventId: string;
+  startedAt: Date;
+  expiresAt: Date;
+};
+
+// Whether this event start already produced a status, including one the user deleted since,
+// so a deleted calendar status isn't recreated.
+export async function hasCalendarStatus(userId: string, googleEventId: string, startedAt: Date): Promise<boolean> {
+  const [row] = await db
+    .select({ id: statuses.id })
+    .from(statuses)
+    .where(
+      and(
+        eq(statuses.userId, userId),
+        eq(statuses.googleEventId, googleEventId),
+        eq(statuses.startedAt, startedAt),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+// Returns null if a status for this event already exists (another server got there first).
+export async function createCalendarStatus(input: CalendarStatusInput): Promise<PublicStatus | null> {
+  const [row] = await db
+    .insert(statuses)
+    .values({ ...input, source: "CALENDAR", note: null })
+    .onConflictDoNothing()
+    .returning({ id: statuses.id });
+  if (!row) return null;
+  const [status] = await selectStatuses().where(eq(statuses.id, row.id));
+  return status;
+}
+
+export type ActiveCalendarStatus = { id: string; googleEventId: string; startedAt: Date; expiresAt: Date };
+
+// The user's CALENDAR statuses that haven't ended yet.
+export async function listActiveCalendarStatuses(userId: string, now: Date): Promise<ActiveCalendarStatus[]> {
+  const rows = await db
+    .select({
+      id: statuses.id,
+      googleEventId: statuses.googleEventId,
+      startedAt: statuses.startedAt,
+      expiresAt: statuses.expiresAt,
+    })
+    .from(statuses)
+    .where(
+      and(
+        isUsersStatus(userId),
+        eq(statuses.source, "CALENDAR"),
+        isNotNull(statuses.googleEventId),
+        gt(statuses.expiresAt, now),
+      ),
+    );
+  return rows.map((row) => ({ ...row, googleEventId: row.googleEventId! }));
+}
+
+export async function updateStatusExpiresAt(statusId: string, expiresAt: Date): Promise<void> {
+  await db.update(statuses).set({ expiresAt }).where(eq(statuses.id, statusId));
 }

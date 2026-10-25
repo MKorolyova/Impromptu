@@ -71,3 +71,12 @@ export async function softDeleteCustomActivity(userId: string, activityId: strin
     .returning({ id: activities.id });
   return deleted.length > 0;
 }
+
+export async function getStandardActivityByName(name: string): Promise<PublicActivity | null> {
+  const [activity] = await db
+    .select(activityColumns)
+    .from(activities)
+    .where(and(isNull(activities.ownerId), isNull(activities.deletedAt), eq(activities.name, name)))
+    .limit(1);
+  return activity ?? null;
+}

@@ -6,6 +6,15 @@ info:
     Users, their activities, and statuses (an activity with an optional note and an expiry).
     Every request needs `Authorization: Bearer <API_KEY>` until user sign-in exists.
     Deletes are soft: the row stays in the database with `deletedAt` set and is no longer returned.
+
+    ## Google Calendar statuses
+    Once Google Calendar is connected, the server reads the rest of the user's day every 15 minutes.
+    Within a minute of an event starting, it picks one of the standard activities for it (with
+    Gemini, standing in for Muse) and creates a status with `source: CALENDAR`, starting and ending
+    with the event, and `note: null`. A cancelled, declined or moved event removes its status; a
+    changed end time moves `expiresAt`. All-day events, events marked Free, out-of-office and
+    working-location events never become statuses. Fetch `GET /users/{userId}/statuses?active=true`
+    to show them.
 servers:
   - url: http://localhost:3000/api/v1
 security:
@@ -200,6 +209,111 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /users/{userId}/google-calendar:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: Whether Google Calendar is connected
+      operationId: getGoogleCalendar
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [googleCalendar]
+                properties:
+                  googleCalendar:
+                    type: object
+                    required: [connected]
+                    properties: { connected: { type: boolean } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Start connecting Google Calendar
+      description: |
+        Open `authUrl` in ASWebAuthenticationSession. After Google's consent screen, the API redirects to
+        `APP_REDIRECT_URL?result=connected|denied|expired|failed`. The link is valid for 10 minutes.
+      operationId: connectGoogleCalendar
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authUrl]
+                properties: { authUrl: { type: string, format: uri } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Disconnect Google Calendar
+      description: Revokes access. Calendar statuses already created stay.
+      operationId: disconnectGoogleCalendar
+      responses:
+        "204": { description: Disconnected }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/google-calendar/events:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: The rest of today's Google Calendar events
+      description: |
+        Read live from Google, up to midnight in the user's time zone; nothing is stored. Sorted by start
+        time, cancelled events left out.
+      operationId: listGoogleCalendarEvents
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/CalendarEvent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/google-calendar/check:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    post:
+      summary: Check the calendar now
+      description: |
+        Re-reads today's events and creates statuses for events that have started, instead of waiting for the
+        next minute's run. Useful for pull-to-refresh.
+      operationId: checkGoogleCalendar
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [check]
+                properties:
+                  check:
+                    type: object
+                    required: [eventsToday, statusesStarted]
+                    properties:
+                      eventsToday: { type: integer, description: Events from now until midnight. }
+                      statusesStarted: { type: integer, description: Statuses created by this check. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /google-calendar/callback:
+    get:
+      summary: Google OAuth callback (called by Google, not the app)
+      operationId: googleCalendarCallback
+      security: []
+      responses:
+        "302": { description: Redirect to APP_REDIRECT_URL with ?result=... }
+
 components:
   securitySchemes:
     apiKey:
@@ -288,6 +402,27 @@ components:
             name: { type: string }
             iconId: { type: [string, "null"], format: uuid }
             isCustom: { type: boolean }
+
+    CalendarEvent:
+      type: object
+      required: [id, title, location, startAt, endAt, allDay, status, responseStatus, hasOtherAttendees, videoCallUrl, eventType, free, becomesStatus]
+      properties:
+        id: { type: string }
+        title: { type: [string, "null"] }
+        location: { type: [string, "null"] }
+        startAt: { type: string, format: date-time, description: All-day events start at 00:00 UTC of their date. }
+        endAt: { type: string, format: date-time }
+        allDay: { type: boolean }
+        status: { type: string, enum: [confirmed, tentative] }
+        responseStatus:
+          type: [string, "null"]
+          enum: [needsAction, declined, tentative, accepted, null]
+          description: The user's own answer; null when they're the only person on the event.
+        hasOtherAttendees: { type: boolean }
+        videoCallUrl: { type: [string, "null"], format: uri }
+        eventType: { type: string, description: default, focusTime, outOfOffice, workingLocation, birthday or fromGmail. }
+        free: { type: boolean, description: Marked "Free" in Google. }
+        becomesStatus: { type: boolean, description: Whether a status will be created when the event starts. }
 
     Error:
       type: object
