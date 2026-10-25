@@ -20,8 +20,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        // Usually a build signed without the Push Notifications capability. Nearby alerts won't arrive.
+        // Usually a build signed by a free developer team, which can't have the Push Notifications
+        // capability. The phone then sends nearby alerts itself.
         print("AppDelegate: couldn't register for push notifications: \(error.localizedDescription)")
+        push?.didFailToRegister()
     }
 
     private func deliverPendingToken() {

@@ -32,6 +32,7 @@ struct Services {
         let location = CoreLocationProvider()
         let notifications = LocalNotificationService(router: router)
         let noteRequests = NoteRequestService(client: client)
+        let push = PushNotificationService(account: account, client: client)
         return Services(
             account: account,
             activities: ActivityService(client: client),
@@ -44,9 +45,10 @@ struct Services {
                 account: account,
                 api: NearbyService(client: client),
                 location: location,
-                notifications: notifications
+                notifications: notifications,
+                push: push
             ),
-            push: PushNotificationService(account: account, client: client),
+            push: push,
             noteRequests: noteRequests,
             noteMonitor: NoteRequestMonitor(account: account, api: noteRequests, notifications: notifications),
             location: location,

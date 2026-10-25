@@ -294,12 +294,14 @@ final class RecordingAPIClient: APIClient {
 }
 
 final class MockPushService: PushRegistering {
+    var isAvailable = false
     private(set) var registerCount = 0
     private(set) var receivedTokens: [Data] = []
     private(set) var unregisteredUserIds: [UUID] = []
 
     func register() { registerCount += 1 }
     func didReceiveDeviceToken(_ deviceToken: Data) async { receivedTokens.append(deviceToken) }
+    func didFailToRegister() { isAvailable = false }
     func unregister(userId: UUID) async { unregisteredUserIds.append(userId) }
 }
 

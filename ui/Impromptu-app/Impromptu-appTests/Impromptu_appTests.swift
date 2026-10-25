@@ -636,16 +636,90 @@ struct APIContractTests {
     }
 }
 
+struct NearbyAlertPolicyTests {
+    private let coding = UUID()
+    private let sam = UUID(), jo = UUID(), priya = UUID()
+    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func firstMatchNotifies() {
+        let (decision, state) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
+        #expect(decision == .notify(newUserIds: [sam]))
+        #expect(state.announcedUserIds == [sam])
+        #expect(state.lastNotifiedAt == start)
+    }
+
+    @Test func sameUsersAnHourLaterSendNothing() {
+        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam, jo], now: start)
+        let (decision, _) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [jo, sam],
+                                                       now: start.addingTimeInterval(2 * 3600))
+        #expect(decision == .skip(.nothingNew))
+    }
+
+    @Test func newUserWithinTheMinuteWaitsThenNotifies() {
+        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
+
+        let (early, waiting) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [sam, jo],
+                                                          now: start.addingTimeInterval(30))
+        #expect(early == .skip(.tooSoon))
+        #expect(!waiting.announcedUserIds.contains(jo))
+
+        let (later, _) = NearbyAlertPolicy.evaluate(state: waiting, activityId: coding, matchingUserIds: [sam, jo],
+                                                    now: start.addingTimeInterval(61))
+        #expect(later == .notify(newUserIds: [jo]))
+    }
+
+    @Test func changingActivityStartsOverButKeepsTimeLimit() {
+        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
+        let studying = UUID()
+
+        let (soon, rebased) = NearbyAlertPolicy.evaluate(state: first, activityId: studying, matchingUserIds: [sam],
+                                                         now: start.addingTimeInterval(30))
+        #expect(soon == .skip(.tooSoon))
+        #expect(rebased.activityId == studying)
+        #expect(rebased.announcedUserIds.isEmpty)
+
+        let (later, _) = NearbyAlertPolicy.evaluate(state: rebased, activityId: studying, matchingUserIds: [sam],
+                                                    now: start.addingTimeInterval(2 * 3600))
+        #expect(later == .notify(newUserIds: [sam]))
+    }
+
+    @Test func noStatusNeverNotifies() {
+        let (decision, _) = NearbyAlertPolicy.evaluate(state: .init(), activityId: nil, matchingUserIds: [sam], now: start)
+        #expect(decision == .skip(.noStatus))
+    }
+}
+
+@MainActor
+struct NearbyAlertMessageTests {
+    private func person(_ name: String) -> Person {
+        Person(id: UUID(), firstName: name, lastName: "X", nickname: nil, status: nil)
+    }
+
+    @Test func onePerson() {
+        let message = NearbyAlertMessage(newPeople: [person("Sam")], totalCount: 1, activityName: "Grabbing coffee")
+        #expect(message.title == "Sam is nearby")
+        #expect(message.body == "Sam is also grabbing coffee within 3 miles.")
+    }
+
+    @Test func severalPeopleWithOthersAlreadyAnnounced() {
+        let message = NearbyAlertMessage(newPeople: ["Sam", "Jo", "Priya"].map(person), totalCount: 5, activityName: "Coding")
+        #expect(message.title == "3 new people nearby")
+        #expect(message.body == "Sam, Jo and 1 more are also coding within 3 miles. 5 people nearby in all.")
+    }
+}
+
 @MainActor
 struct NearbyAlertsServiceTests {
     private let api = MockNearbyService()
     private let location = MockLocationProvider()
     private let notifications = MockNotificationService()
+    /// Unavailable unless a test says otherwise, as on a build from a free developer team.
+    private let push = MockPushService()
     private let defaults = UserDefaults(suiteName: "NearbyAlertsServiceTests-\(UUID().uuidString)")!
 
-    private func makeService() -> NearbyAlertsService {
+    private func makeService(now: @escaping () -> Date = { .now }) -> NearbyAlertsService {
         NearbyAlertsService(account: MockAccountService(), api: api, location: location,
-                            notifications: notifications, defaults: defaults)
+                            notifications: notifications, push: push, defaults: defaults, now: now)
     }
 
     @Test func enablingStartsMonitoring() async {
@@ -673,7 +747,44 @@ struct NearbyAlertsServiceTests {
         #expect(!outcome.notificationsAllowed)
     }
 
-    @Test func backgroundCheckSharesLocationAndLeavesNotifyingToServer() async {
+    @Test func withPushTheServerNotifiesNotThePhone() async throws {
+        push.isAvailable = true
+        let service = makeService()
+        _ = await service.enable()
+
+        await service.performBackgroundCheck()
+        _ = try await service.refreshInForeground()
+        #expect(api.sharedLocations.count == 2)
+        #expect(notifications.posted.isEmpty)
+    }
+
+    @Test func withoutPushThePhoneNotifiesOnceForSamePeople() async {
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        let service = makeService(now: { clock })
+        _ = await service.enable()
+
+        await service.performBackgroundCheck()
+        #expect(api.sharedLocations.count == 1)
+        #expect(notifications.posted.count == 1)
+        #expect(notifications.posted.first?.route == .nearbyPeople)
+        #expect(notifications.posted.first?.title == "3 new people nearby")
+
+        clock.addTimeInterval(2 * 3600)
+        await service.performBackgroundCheck()
+        #expect(notifications.posted.count == 1)
+    }
+
+    @Test func withoutPushNewMatchesPopUpWhileTheAppIsOpen() async throws {
+        let service = makeService()
+        _ = await service.enable()
+
+        let result = try await service.refreshInForeground()
+        #expect(result.users.count == 3)
+        #expect(notifications.posted.count == 1)
+    }
+
+    @Test func withoutNotificationPermissionNothingIsPosted() async {
+        notifications.authorized = false
         let service = makeService()
         _ = await service.enable()
 
@@ -721,10 +832,23 @@ struct NearbyAlertsServiceTests {
 @MainActor
 struct PushNotificationServiceTests {
     private let client = RecordingAPIClient()
+    private let defaults = UserDefaults(suiteName: "PushNotificationServiceTests-\(UUID().uuidString)")!
+
+    @Test func availableOnceIOSGivesATokenAndNotAfterItRefuses() async {
+        let service = PushNotificationService(account: MockAccountService(), client: client, defaults: defaults, requestToken: {})
+        #expect(!service.isAvailable)
+        await service.didReceiveDeviceToken(Data([0x01]))
+        #expect(service.isAvailable)
+        // Remembered for the next launch.
+        #expect(PushNotificationService(account: MockAccountService(), client: client, defaults: defaults, requestToken: {}).isAvailable)
+
+        service.didFailToRegister()
+        #expect(!service.isAvailable)
+    }
 
     @Test func tokenIsRegisteredAsHexForTheSignedInUser() async throws {
         var requests = 0
-        let service = PushNotificationService(account: MockAccountService(), client: client, requestToken: { requests += 1 })
+        let service = PushNotificationService(account: MockAccountService(), client: client, defaults: defaults, requestToken: { requests += 1 })
         service.register()
         #expect(requests == 1)
 
@@ -738,14 +862,14 @@ struct PushNotificationServiceTests {
     }
 
     @Test func tokenArrivingWhileSignedOutIsKeptButNotSent() async {
-        let service = PushNotificationService(account: MockAccountService(signedIn: false), client: client, requestToken: {})
+        let service = PushNotificationService(account: MockAccountService(signedIn: false), client: client, defaults: defaults, requestToken: {})
         await service.didReceiveDeviceToken(Data([0x01]))
         #expect(service.deviceToken == "01")
         #expect(client.sent.isEmpty)
     }
 
     @Test func unregisteringRemovesThisDevicesToken() async throws {
-        let service = PushNotificationService(account: MockAccountService(), client: client, requestToken: {})
+        let service = PushNotificationService(account: MockAccountService(), client: client, defaults: defaults, requestToken: {})
         await service.unregister(userId: SampleData.user.id)
         // Nothing to remove before iOS has handed over a token.
         #expect(client.sent.isEmpty)
