@@ -9,9 +9,9 @@
 	<key>CalendarCallbackScheme</key>
 	<string>impromptu</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Impromptu uses your location to find people within a mile doing the same thing as you. Your exact location is never shown to anyone.</string>
+	<string>Impromptu uses your location to find people within 3 miles doing the same thing as you. Your exact location is never shown to anyone.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Allow Always so Impromptu can let you know, at most once a minute, when someone new nearby is doing the same thing, even while the app is closed. Your exact location is never shown to anyone.</string>
+	<string>Allow Always so Impromptu can let you know when someone nearby starts doing the same thing as you, even while the app is closed. Your exact location is never shown to anyone.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
@@ -21,7 +21,14 @@
 		<string>xhilgerz.Impromptu-app.nearby-check</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Impromptu connects to a development server on your local network.</string>
+	<string>Impromptu finds friends nearby who have Add Friend open, so you can add each other by holding your phones together.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_impromptu-add._tcp</string>
+		<string>_impromptu-add._udp</string>
+	</array>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Impromptu senses when your phone touches a friend's, so you can add each other as friends.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

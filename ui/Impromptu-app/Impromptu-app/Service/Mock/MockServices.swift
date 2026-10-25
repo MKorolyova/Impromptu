@@ -131,6 +131,21 @@ final class MockFriendService: FriendServicing {
         return friend
     }
 
+    func addFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend {
+        let known = friends.first { $0.id == friendId }
+            ?? directory.values.first { $0.id == friendId }
+            ?? SampleData.people.first { $0.id == friendId }.map {
+                Friend(id: $0.id, firstName: $0.firstName, lastName: $0.lastName, nickname: $0.nickname,
+                       canSeeLocation: false, canSeeNotes: false)
+            }
+        guard var friend = known else {
+            throw APIError.http(statusCode: 404, code: .notFound, message: "That person isn't on Impromptu anymore")
+        }
+        friend.apply(access)
+        upsert(friend)
+        return friend
+    }
+
     func updateFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend {
         guard var friend = friends.first(where: { $0.id == friendId }) else {
             throw APIError.http(statusCode: 404, code: .notFound, message: "Friend not found")
@@ -158,6 +173,38 @@ private extension Friend {
         if let canSeeLocation = access.canSeeLocation { self.canSeeLocation = canSeeLocation }
         if let canSeeNotes = access.canSeeNotes { self.canSeeNotes = canSeeNotes }
     }
+}
+
+final class MockNearbyFriendFinder: NearbyFriendFinding {
+    var canMeasureDistance = true
+    var onEvent: ((NearbyFriendEvent) -> Void)?
+    /// Shown as soon as the screen opens, for previews.
+    var peersOnStart: [NearbyPeer]
+    private(set) var startedAs: NearbyIdentity?
+    private(set) var accepted: [String] = []
+    private(set) var declined: [String] = []
+
+    init(peersOnStart: [NearbyPeer] = [MockNearbyFriendFinder.samplePeer]) {
+        self.peersOnStart = peersOnStart
+    }
+
+    static let samplePeer = NearbyPeer(
+        id: "sample-peer",
+        identity: NearbyIdentity(userId: SampleData.people[0].id, firstName: "Sam", lastName: "Lee", nickname: nil),
+        distance: 0.4
+    )
+
+    func start(as identity: NearbyIdentity) {
+        startedAs = identity
+        peersOnStart.forEach { onEvent?(.updated($0)) }
+    }
+
+    func stop() { startedAs = nil }
+    func accept(_ peerId: String) { accepted.append(peerId) }
+    func decline(_ peerId: String) { declined.append(peerId) }
+
+    /// For tests: something happening on the other phone.
+    func send(_ event: NearbyFriendEvent) { onEvent?(event) }
 }
 
 final class MockCalendarService: CalendarServicing {

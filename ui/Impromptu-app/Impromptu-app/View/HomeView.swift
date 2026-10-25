@@ -5,12 +5,13 @@
 
 import SwiftUI
 
-/// The feed: you and your status composer on top, then everyone else's statuses.
+/// The feed: you and your status composer on top, then what your friends are up to, then everyone else.
 struct HomeView: View {
     private enum Sheet: Identifiable {
         case activities
         case nearbyPeople
         case notes
+        case addFriend
 
         var id: Self { self }
     }
@@ -53,7 +54,7 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    notesButton
+                    addFriendButton
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     profileMenu
@@ -81,6 +82,8 @@ struct HomeView: View {
                     NearbyPeopleView(user: viewModel.user, services: services) { self.sheet = .notes }
                 case .notes:
                     NotesInboxView(user: viewModel.user, services: services)
+                case .addFriend:
+                    AddFriendNearbyView(user: viewModel.user, services: services)
                 }
             }
             // A tapped notification, including one that launched the app before this view existed.
@@ -120,69 +123,89 @@ struct HomeView: View {
             }
         case .loaded:
             if viewModel.people.isEmpty {
-                ContentUnavailableView("No one else is here yet", systemImage: "person.2",
-                                       description: Text("Invite friends to see what they're up to."))
+                ContentUnavailableView {
+                    Label("No one else is here yet", systemImage: "person.2")
+                } description: {
+                    Text("Add a friend to see what they're up to.")
+                } actions: {
+                    Button("Add Friend", systemImage: "person.badge.plus") { sheet = .addFriend }
+                        .buttonStyle(.brand(.primary, compact: true))
+                }
             } else {
-                if !viewModel.activePeople.isEmpty {
-                    SectionHeader(title: "Happening now", count: viewModel.activePeople.count)
-                    ForEach(viewModel.activePeople) { person in
+                SectionHeader(title: "Happening now",
+                              count: viewModel.friendsHappening.isEmpty ? nil : viewModel.friendsHappening.count)
+                if viewModel.friendsHappening.isEmpty {
+                    noFriendsHappening
+                } else {
+                    ForEach(viewModel.friendsHappening) { person in
                         if let status = person.activeStatus {
                             PersonCard(person: person, status: status)
                         }
                     }
                 }
-                if !viewModel.idlePeople.isEmpty {
-                    SectionHeader(title: "Everyone else", count: viewModel.idlePeople.count)
-                        .padding(.top, 8)
-                    VStack(spacing: 0) {
-                        ForEach(viewModel.idlePeople) { person in
-                            IdlePersonRow(person: person)
-                            if person.id != viewModel.idlePeople.last?.id {
-                                Divider().padding(.leading, 48)
-                            }
-                        }
+                peopleList("Friends", viewModel.quietFriends)
+                peopleList("Everyone else", viewModel.everyoneElse)
+            }
+        }
+    }
+
+    /// "Happening now" is friends only; until there are some, say so and offer to add one.
+    private var noFriendsHappening: some View {
+        let hasFriends = !viewModel.friendIds.isEmpty
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(hasFriends ? "None of your friends have a status right now." : "Add friends to see what they're up to here.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if !hasFriends {
+                Button("Add Friend", systemImage: "person.badge.plus") { sheet = .addFriend }
+                    .buttonStyle(.brand(.secondary, compact: true))
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
+    }
+
+    @ViewBuilder
+    private func peopleList(_ title: String, _ people: [Person]) -> some View {
+        if !people.isEmpty {
+            SectionHeader(title: title, count: people.count)
+                .padding(.top, 8)
+            VStack(spacing: 0) {
+                ForEach(people) { person in
+                    PersonRow(person: person)
+                    if person.id != people.last?.id {
+                        Divider().padding(.leading, 48)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 6)
-                    .cardBackground()
                 }
             }
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            .cardBackground()
         }
     }
 
-    private var notesButton: some View {
+    private var addFriendButton: some View {
         Button {
-            sheet = .notes
+            sheet = .addFriend
         } label: {
-            Label("Notes", systemImage: viewModel.openNoteRequestCount > 0 ? "tray.full.fill" : "tray")
+            Label("Add Friend", systemImage: "person.badge.plus")
         }
-        .overlay(alignment: .topTrailing) {
-            if viewModel.openNoteRequestCount > 0 {
-                Text("\(viewModel.openNoteRequestCount)")
-                    .font(.caption2.bold())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(.red, in: Capsule())
-                    .offset(x: 8, y: -6)
-                    .accessibilityHidden(true)
-            }
-        }
-        .accessibilityValue(viewModel.openNoteRequestCount > 0 ? "\(viewModel.openNoteRequestCount) waiting" : "")
     }
 
-    /// Requests and replies may have changed while a sheet was up.
+    /// A sheet may have added a friend or changed requests and replies.
     private func refreshAfterSheet() {
-        Task {
-            await viewModel.refreshNotes()
-            await viewModel.refreshNearby()
-        }
+        Task { await viewModel.load() }
     }
 
-    /// Top right: settings, light/dark, and log out.
+    /// Top right: notes, settings, light/dark, and log out. A red dot while note requests are waiting.
     private var profileMenu: some View {
-        Menu {
+        let waiting = viewModel.openNoteRequestCount
+        return Menu {
             Section(viewModel.user.email) {
+                Button(waiting > 0 ? "Notes (\(waiting) waiting)" : "Notes", systemImage: waiting > 0 ? "tray.full" : "tray") {
+                    sheet = .notes
+                }
                 Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
                 Button(isDark ? "Light Mode" : "Dark Mode", systemImage: isDark ? "sun.max" : "moon", action: toggleTheme)
             }
@@ -190,8 +213,18 @@ struct HomeView: View {
         } label: {
             AvatarView(id: viewModel.user.id, firstName: viewModel.user.firstName, lastName: viewModel.user.lastName,
                        size: 32, usesBrandColors: true)
+                .overlay(alignment: .topTrailing) {
+                    if waiting > 0 {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().strokeBorder(Color.appBackground, lineWidth: 1.5))
+                            .offset(x: 2, y: -2)
+                    }
+                }
         }
         .accessibilityLabel("Profile")
+        .accessibilityValue(waiting > 0 ? "\(waiting) note requests waiting" : "")
     }
 
     private var isDark: Bool { colorScheme == .dark }

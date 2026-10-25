@@ -51,6 +51,8 @@ final class HomeViewModel {
     private(set) var myStatus: Status?
     /// Everyone except the signed-in user, in the server's order (active statuses first).
     private(set) var people: [Person] = []
+    /// The people you've added as friends; the feed shows them first.
+    private(set) var friendIds: Set<UUID> = []
     private(set) var activities: [Activity] = []
     /// The ones picked at sign-up; the composer's drop-down lists these.
     private(set) var savedActivities: [Activity] = []
@@ -83,12 +85,19 @@ final class HomeViewModel {
         myStatus.flatMap { $0.isActive() ? $0 : nil }
     }
 
-    var activePeople: [Person] {
-        people.filter { $0.activeStatus != nil }
+    /// "Happening now": friends with a live status.
+    var friendsHappening: [Person] {
+        people.filter { friendIds.contains($0.id) && $0.activeStatus != nil }
     }
 
-    var idlePeople: [Person] {
-        people.filter { $0.activeStatus == nil }
+    /// Friends without a status right now.
+    var quietFriends: [Person] {
+        people.filter { friendIds.contains($0.id) && $0.activeStatus == nil }
+    }
+
+    /// Everyone who isn't a friend, those with a live status first.
+    var everyoneElse: [Person] {
+        people.filter { !friendIds.contains($0.id) }
     }
 
     /// The drop-down's choices: the saved activities (everything for accounts that never picked any),
@@ -127,6 +136,7 @@ final class HomeViewModel {
             async let saved = services.activities.fetchSavedActivities(for: user.id)
             // The built-in list doesn't change while the app runs, so fetch it once.
             async let standard = standardActivities.isEmpty ? services.activities.fetchStandardActivities() : standardActivities
+            async let friends = services.friends.fetchFriends(for: user.id)
             let (loadedStatus, loadedPeople, loadedActivities) = try await (status, people, activities)
             myStatus = loadedStatus
             self.people = loadedPeople.filter { $0.id != user.id }
@@ -134,6 +144,8 @@ final class HomeViewModel {
             // The drop-down falls back to every activity, so the feed still loads without these.
             savedActivities = (try? await saved) ?? savedActivities
             standardActivities = (try? await standard) ?? standardActivities
+            // Without the friends list everyone shows under "Everyone else"; keep the last one if this fails.
+            if let loadedFriends = try? await friends { friendIds = Set(loadedFriends.map(\.id)) }
             // Later refreshes leave whatever is being typed alone.
             if isFirstLoad { resetDraft() }
             loadState = .loaded

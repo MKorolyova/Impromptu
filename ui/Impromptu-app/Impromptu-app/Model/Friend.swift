@@ -26,9 +26,10 @@ struct FriendAccess: Encodable, Equatable {
     var canSeeNotes: Bool?
 }
 
-/// Body of `POST /users/{userId}/friends`.
+/// Body of `POST /users/{userId}/friends`: who to add, by email or by user ID (exactly one).
 struct AddFriendRequest: Encodable {
-    var email: String
+    var email: String?
+    var friendId: UUID?
     var canSeeLocation: Bool?
     var canSeeNotes: Bool?
 }

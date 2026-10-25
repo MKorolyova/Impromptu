@@ -10,6 +10,8 @@ protocol FriendServicing {
     /// Adds someone by email, or changes what they can see if they're already a friend.
     /// Fails with `.notFound` when no one uses that email.
     func addFriend(email: String, access: FriendAccess, for userId: UUID) async throws -> Friend
+    /// The same, by user ID, as two phones held together exchange. Fails with `.notFound` if they left.
+    func addFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend
     func updateFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend
     func removeFriend(_ friendId: UUID, for userId: UUID) async throws
 }
@@ -36,6 +38,12 @@ final class FriendService: FriendServicing {
 
     func addFriend(email: String, access: FriendAccess, for userId: UUID) async throws -> Friend {
         let request = AddFriendRequest(email: email, canSeeLocation: access.canSeeLocation, canSeeNotes: access.canSeeNotes)
+        let envelope: FriendEnvelope = try await client.send(.addFriend(request, for: userId))
+        return envelope.friend
+    }
+
+    func addFriend(_ friendId: UUID, access: FriendAccess, for userId: UUID) async throws -> Friend {
+        let request = AddFriendRequest(friendId: friendId, canSeeLocation: access.canSeeLocation, canSeeNotes: access.canSeeNotes)
         let envelope: FriendEnvelope = try await client.send(.addFriend(request, for: userId))
         return envelope.friend
     }

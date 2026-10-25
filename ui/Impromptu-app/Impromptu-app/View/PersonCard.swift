@@ -52,20 +52,31 @@ struct PersonCard: View {
     }
 }
 
-/// A compact row for someone without a live status.
-struct IdlePersonRow: View {
+/// A compact row in a list of people: their activity if they have one, "No status" otherwise.
+struct PersonRow: View {
     let person: Person
 
     var body: some View {
+        let status = person.activeStatus
         HStack(spacing: 12) {
-            AvatarView(id: person.id, firstName: person.firstName, lastName: person.lastName, size: 36)
-                .opacity(0.6)
+            AvatarView(id: person.id, firstName: person.firstName, lastName: person.lastName, size: 36,
+                       isActive: status != nil)
+                .opacity(status == nil ? 0.6 : 1)
             Text(person.displayName)
-                .font(.subheadline)
+                .font(.subheadline.weight(status == nil ? .regular : .semibold))
             Spacer()
-            Text("No status")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if let status {
+                HStack(spacing: 6) {
+                    ActivityIcon(activityName: status.activity.name, size: 22)
+                    Text(status.activity.name)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
+            } else {
+                Text("No status")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
@@ -93,7 +104,7 @@ struct StatusLine: View {
                 if let status = person.activeStatus {
                     PersonCard(person: person, status: status)
                 } else {
-                    IdlePersonRow(person: person)
+                    PersonRow(person: person)
                 }
             }
         }

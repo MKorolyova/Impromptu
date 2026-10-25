@@ -390,10 +390,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
-      summary: Add a friend by email, or change what they can see
+      summary: Add a friend by email or user ID, or change what they can see
       description: |
-        Exact email match, ignoring capitals. If they're already a friend, only the access fields sent change.
-        Someone new can see nothing unless the request says so.
+        Send exactly one of `email` (exact match, ignoring capitals) or `friendId` (a user ID, e.g. from two
+        phones held together). If they're already a friend, only the access fields sent change. Someone new
+        can see nothing unless the request says so.
       operationId: addFriend
       requestBody:
         required: true
@@ -401,9 +402,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email]
               properties:
                 email: { type: string, format: email }
+                friendId: { type: string, format: uuid }
                 canSeeLocation: { type: boolean }
                 canSeeNotes: { type: boolean }
       responses:
@@ -418,7 +419,7 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404":
-          description: The user doesn't exist, or no one has that email.
+          description: The user doesn't exist, no one has that email, or `friendId` isn't an active user.
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
   /users/{userId}/friends/{friendId}:

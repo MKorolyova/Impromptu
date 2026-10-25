@@ -14,11 +14,12 @@ struct HomeViewModelTests {
     private let widgets = MockWidgetSyncService()
 
     private func makeViewModel(statuses: MockStatusService? = nil, people: MockPeopleService? = nil,
-                               nearbyAlerts: MockNearbyAlerts? = nil) -> HomeViewModel {
+                               nearbyAlerts: MockNearbyAlerts? = nil, friends: MockFriendService? = nil) -> HomeViewModel {
         let services = Services(
             account: MockAccountService(),
             activities: MockActivityService(),
-            friends: MockFriendService(),
+            friends: friends ?? MockFriendService(),
+            nearbyFriends: MockNearbyFriendFinder(peersOnStart: []),
             calendar: MockCalendarService(),
             statusPreferences: MockStatusPreferencesStore(),
             statuses: statuses ?? MockStatusService(),
@@ -64,10 +65,25 @@ struct HomeViewModelTests {
 
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.people.count == SampleData.people.count)
-        #expect(viewModel.activePeople.count + viewModel.idlePeople.count == SampleData.people.count)
-        #expect(viewModel.activePeople.allSatisfy { $0.activeStatus != nil })
+        // Sam and Jo are friends with a status (MockFriendService); nobody else is a friend.
+        #expect(viewModel.friendsHappening.map(\.firstName) == ["Sam", "Jordan"])
+        #expect(viewModel.quietFriends.isEmpty)
+        #expect(viewModel.everyoneElse.map(\.firstName) == ["Priya", "Marcus", "Taylor", "Diego"])
         #expect(widgets.syncCount == 1)
         #expect(widgets.lastPeople.count == SampleData.people.count)
+    }
+
+    @Test func friendsWithoutAStatusAreListedBeforeEveryoneElse() async {
+        let friends = MockFriendService()
+        let taylor = SampleData.people[4]
+        friends.friends.append(Friend(id: taylor.id, firstName: "Taylor", lastName: "Kim", nickname: nil,
+                                      canSeeLocation: true, canSeeNotes: true))
+        let viewModel = makeViewModel(friends: friends)
+        await viewModel.load()
+
+        #expect(viewModel.quietFriends.map(\.firstName) == ["Taylor"])
+        #expect(!viewModel.everyoneElse.contains { $0.id == taylor.id })
+        #expect(!viewModel.friendsHappening.contains { $0.id == taylor.id })
     }
 
     @Test func feedLeavesOutTheSignedInUser() async {
@@ -206,6 +222,7 @@ struct RegistrationViewModelTests {
             account: account,
             activities: activities,
             friends: MockFriendService(),
+            nearbyFriends: MockNearbyFriendFinder(peersOnStart: []),
             calendar: calendar,
             statusPreferences: preferences,
             statuses: MockStatusService(),
@@ -401,6 +418,7 @@ struct SettingsViewModelTests {
             account: MockAccountService(),
             activities: MockActivityService(),
             friends: friends,
+            nearbyFriends: MockNearbyFriendFinder(peersOnStart: []),
             calendar: MockCalendarService(),
             statusPreferences: MockStatusPreferencesStore(),
             statuses: MockStatusService(),
@@ -590,6 +608,16 @@ struct APIContractTests {
         let object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder.api.encode(request)) as? [String: Any])
         #expect(Set(object.keys) == ["firstName", "lastName", "nickname"])
         #expect(object["nickname"] is NSNull)
+    }
+
+    @Test func addingAFriendByIdSendsNoEmail() throws {
+        let id = UUID(uuidString: "7F1B7C4E-8A0E-4C55-9D0E-0B6C2A1D9F13")!
+        let body = try JSONSerialization.jsonObject(
+            with: JSONEncoder.api.encode(AddFriendRequest(friendId: id, canSeeLocation: true, canSeeNotes: true))
+        ) as? [String: Any]
+        #expect(body?["email"] == nil)
+        #expect(body?["friendId"] as? String == id.uuidString)
+        #expect(body?["canSeeLocation"] as? Bool == true)
     }
 
     @Test func friendAccessOmitsUnchangedFields() throws {
@@ -916,6 +944,135 @@ struct PushNotificationServiceTests {
 }
 
 @MainActor
+struct AddFriendNearbyViewModelTests {
+    private let finder = MockNearbyFriendFinder(peersOnStart: [])
+    private let friends = MockFriendService()
+
+    private func makeViewModel() -> AddFriendNearbyViewModel {
+        let services = Services.mock().replacing(friends: friends, nearbyFriends: finder)
+        let viewModel = AddFriendNearbyViewModel(user: SampleData.user, services: services)
+        viewModel.start()
+        return viewModel
+    }
+
+    /// Priya isn't a friend yet; MockFriendService knows her.
+    private func priya(at distance: Float?) -> NearbyPeer {
+        NearbyPeer(id: "priya-phone",
+                   identity: NearbyIdentity(userId: SampleData.people[2].id, firstName: "Priya", lastName: "Shah", nickname: nil),
+                   distance: distance)
+    }
+
+    @Test func introducesYouToNearbyPhones() {
+        _ = makeViewModel()
+        #expect(finder.startedAs?.userId == SampleData.user.id)
+        #expect(finder.startedAs?.firstName == SampleData.user.firstName)
+    }
+
+    @Test func touchingPhonesOffersToBecomeFriends() {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.6)))
+        #expect(viewModel.phase == .looking)
+        #expect(viewModel.peers.count == 1)
+
+        finder.send(.updated(priya(at: 0.08)))
+        #expect(viewModel.phase == .offer(priya(at: 0.08)))
+    }
+
+    @Test func bothAcceptingMakesThemFriendsWithLocationAndNotes() async throws {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.08)))
+        await viewModel.accept()
+        #expect(viewModel.phase == .waiting(priya(at: 0.08)))
+        #expect(finder.accepted == ["priya-phone"])
+
+        finder.send(.accepted(peerId: "priya-phone"))
+        try await Task.sleep(for: .milliseconds(50))
+        guard case .friends(let friend) = viewModel.phase else {
+            Issue.record("Expected friends, got \(viewModel.phase)")
+            return
+        }
+        #expect(friend.id == SampleData.people[2].id)
+        #expect(friend.canSeeLocation && friend.canSeeNotes)
+        #expect(friends.friends.contains { $0.id == friend.id })
+    }
+
+    @Test func whenTheyAcceptFirstAcceptingAddsRightAway() async {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.08)))
+        finder.send(.accepted(peerId: "priya-phone"))
+        await viewModel.accept()
+        guard case .friends = viewModel.phase else {
+            Issue.record("Expected friends, got \(viewModel.phase)")
+            return
+        }
+    }
+
+    @Test func notNowIsntOfferedAgain() {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.08)))
+        viewModel.decline()
+        #expect(finder.declined == ["priya-phone"])
+        #expect(viewModel.phase == .looking)
+
+        finder.send(.updated(priya(at: 0.05)))
+        #expect(viewModel.phase == .looking)
+    }
+
+    @Test func theirNotNowEndsTheWait() async {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.08)))
+        await viewModel.accept()
+        finder.send(.declined(peerId: "priya-phone"))
+        #expect(viewModel.phase == .ended("Priya said not now."))
+
+        viewModel.lookAgain()
+        #expect(viewModel.phase == .looking)
+    }
+
+    @Test func closingTheScreenDuringTheOfferEndsIt() {
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: 0.08)))
+        finder.send(.lost(peerId: "priya-phone"))
+        #expect(viewModel.phase == .ended("Priya closed Add Friend."))
+        #expect(viewModel.peers.isEmpty)
+    }
+
+    @Test func withoutDistanceTheyPickYouFromTheListAndYouSeeTheOffer() {
+        finder.canMeasureDistance = false
+        let viewModel = makeViewModel()
+        #expect(!viewModel.usesTouch)
+        finder.send(.updated(priya(at: nil)))
+        #expect(viewModel.phase == .looking)
+
+        finder.send(.accepted(peerId: "priya-phone"))
+        #expect(viewModel.phase == .offer(priya(at: nil)))
+    }
+
+    @Test func pickingSomeoneFromTheListAsksThem() async {
+        finder.canMeasureDistance = false
+        let viewModel = makeViewModel()
+        finder.send(.updated(priya(at: nil)))
+        await viewModel.request(priya(at: nil))
+        #expect(viewModel.phase == .waiting(priya(at: nil)))
+        #expect(finder.accepted == ["priya-phone"])
+    }
+
+    @Test func turningDownNearbyInteractionsFallsBackToTheList() {
+        let viewModel = makeViewModel()
+        #expect(viewModel.usesTouch)
+        finder.send(.distanceNotAllowed)
+        #expect(!viewModel.usesTouch)
+    }
+
+    @Test func messagesBetweenPhonesRoundTrip() throws {
+        let hello = NearbyFriendMessage.hello(priya(at: nil).identity, distanceToken: Data([1, 2, 3]))
+        for message in [hello, .accept, .decline] {
+            #expect(try JSONDecoder().decode(NearbyFriendMessage.self, from: JSONEncoder().encode(message)) == message)
+        }
+    }
+}
+
+@MainActor
 struct NearbyContractTests {
     @Test func decodesNearbyResponse() throws {
         let json = Data(#"""
@@ -1167,6 +1324,8 @@ struct NoteRequestContractTests {
 extension Services {
     /// A copy with some services swapped, so tests don't break each time `Services` gains a field.
     func replacing(
+        friends: FriendServicing? = nil,
+        nearbyFriends: NearbyFriendFinding? = nil,
         nearbyAlerts: NearbyAlerting? = nil,
         push: PushRegistering? = nil,
         noteRequests: NoteRequestServicing? = nil,
@@ -1174,7 +1333,8 @@ extension Services {
         location: LocationProviding? = nil
     ) -> Services {
         Services(
-            account: account, activities: activities, friends: friends, calendar: calendar,
+            account: account, activities: activities, friends: friends ?? self.friends,
+            nearbyFriends: nearbyFriends ?? self.nearbyFriends, calendar: calendar,
             statusPreferences: statusPreferences, statuses: statuses, people: people,
             nearbyAlerts: nearbyAlerts ?? self.nearbyAlerts,
             push: push ?? self.push,
@@ -1258,7 +1418,7 @@ struct ActivitiesPageTests {
 extension Services {
     func replacingActivities(_ activities: ActivityServicing) -> Services {
         Services(
-            account: account, activities: activities, friends: friends, calendar: calendar,
+            account: account, activities: activities, friends: friends, nearbyFriends: nearbyFriends, calendar: calendar,
             statusPreferences: statusPreferences, statuses: statuses, people: people,
             nearbyAlerts: nearbyAlerts, push: push, noteRequests: noteRequests, noteMonitor: noteMonitor,
             location: location, router: router, widgets: widgets

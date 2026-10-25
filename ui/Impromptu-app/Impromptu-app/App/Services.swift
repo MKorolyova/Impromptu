@@ -11,6 +11,8 @@ struct Services {
     let account: AccountServicing
     let activities: ActivityServicing
     let friends: FriendServicing
+    /// Add Friend → Nearby: finds phones with the screen open, phone to phone.
+    let nearbyFriends: NearbyFriendFinding
     let calendar: CalendarServicing
     let statusPreferences: StatusPreferencesStoring
     let statuses: StatusServicing
@@ -37,6 +39,7 @@ struct Services {
             account: account,
             activities: ActivityService(client: client),
             friends: FriendService(client: client),
+            nearbyFriends: NearbyFriendFinder(),
             calendar: CalendarService(client: client),
             statusPreferences: StatusPreferencesStore(),
             statuses: StatusService(client: client),
@@ -63,6 +66,7 @@ struct Services {
             account: MockAccountService(signedIn: signedIn),
             activities: MockActivityService(),
             friends: MockFriendService(),
+            nearbyFriends: MockNearbyFriendFinder(),
             calendar: MockCalendarService(),
             statusPreferences: MockStatusPreferencesStore(),
             statuses: MockStatusService(),
