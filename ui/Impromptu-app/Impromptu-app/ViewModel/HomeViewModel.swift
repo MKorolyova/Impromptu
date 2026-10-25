@@ -62,6 +62,8 @@ final class HomeViewModel {
     private(set) var isChangingNearby = false
     /// Why nearby alerts can't fully work, shown under the toggle.
     private(set) var nearbyNotice: NearbyNotice?
+    /// Note requests waiting on your reply; the inbox badge.
+    private(set) var openNoteRequestCount = 0
     var isComposerOpen = false
     var draft = StatusDraft()
     var errorMessage: String?
@@ -115,6 +117,7 @@ final class HomeViewModel {
             loadState = .loaded
             syncWidget()
             await refreshNearby()
+            await refreshNotes()
         } catch {
             // Keep showing what we have if this was a background refresh.
             if loadState == .loaded {
@@ -204,6 +207,14 @@ final class HomeViewModel {
         }
         // Nearby is an extra; if it fails, the rest of the feed still works.
         nearby = try? await services.nearbyAlerts.refreshInForeground()
+    }
+
+    // MARK: Notes
+
+    /// Polls the inbox; new requests and replies show as banners while the app is open.
+    func refreshNotes() async {
+        guard let inbox = try? await services.noteMonitor.poll(notify: true) else { return }
+        openNoteRequestCount = inbox.openIncomingCount
     }
 
     // MARK: Custom activities

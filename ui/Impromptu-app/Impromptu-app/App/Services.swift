@@ -13,11 +13,20 @@ struct Services {
     let statuses: StatusServicing
     let people: PeopleServicing
     let nearbyAlerts: NearbyAlerting
+    let noteRequests: NoteRequestServicing
+    let noteMonitor: NoteRequestMonitoring
+    /// Shared by nearby alerts and note replies, so there's one CLLocationManager.
+    let location: LocationProviding
+    let router: AppRouter
     let widgets: WidgetSyncing
 
     static func live() -> Services {
         let client = URLSessionAPIClient()
         let account = AccountService(client: client)
+        let router = AppRouter()
+        let location = CoreLocationProvider()
+        let notifications = LocalNotificationService(router: router)
+        let noteRequests = NoteRequestService(client: client)
         return Services(
             account: account,
             activities: ActivityService(client: client),
@@ -26,20 +35,29 @@ struct Services {
             nearbyAlerts: NearbyAlertsService(
                 account: account,
                 api: NearbyService(client: client),
-                location: CoreLocationProvider(),
-                notifications: LocalNotificationService()
+                location: location,
+                notifications: notifications
             ),
+            noteRequests: noteRequests,
+            noteMonitor: NoteRequestMonitor(account: account, api: noteRequests, notifications: notifications),
+            location: location,
+            router: router,
             widgets: WidgetSyncService()
         )
     }
 
     static func mock(signedIn: Bool = true) -> Services {
-        Services(
+        let noteRequests = MockNoteRequestService()
+        return Services(
             account: MockAccountService(signedIn: signedIn),
             activities: MockActivityService(),
             statuses: MockStatusService(),
             people: MockPeopleService(),
             nearbyAlerts: MockNearbyAlerts(),
+            noteRequests: noteRequests,
+            noteMonitor: MockNoteRequestMonitor(service: noteRequests),
+            location: MockLocationProvider(),
+            router: AppRouter(),
             widgets: MockWidgetSyncService()
         )
     }

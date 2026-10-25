@@ -12,6 +12,8 @@ struct Person: Codable, Identifiable, Hashable {
     var lastName: String
     var nickname: String?
     var status: Status?
+    /// Only from `GET /users/{userId}/nearby`: rounded up to 100 m.
+    var distanceMeters: Int?
 
     var displayName: String {
         nickname ?? firstName

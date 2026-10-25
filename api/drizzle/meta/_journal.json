@@ -43,6 +43,13 @@
       "when": 1792915032515,
       "tag": "0005_user_locations_srid",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792916635265,
+      "tag": "0006_note_requests",
+      "breakpoints": true
     }
   ]
 }

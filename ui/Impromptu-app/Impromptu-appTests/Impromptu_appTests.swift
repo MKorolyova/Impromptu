@@ -21,6 +21,10 @@ struct HomeViewModelTests {
             statuses: statuses ?? MockStatusService(),
             people: people ?? MockPeopleService(),
             nearbyAlerts: nearbyAlerts ?? MockNearbyAlerts(enabled: false),
+            noteRequests: MockNoteRequestService(),
+            noteMonitor: MockNoteRequestMonitor(),
+            location: MockLocationProvider(),
+            router: AppRouter(),
             widgets: widgets
         )
         return HomeViewModel(user: SampleData.user, services: services)
@@ -29,7 +33,8 @@ struct HomeViewModelTests {
     @Test func nearbyLoadsWhenEnabledAndClearsWhenTurnedOff() async {
         let viewModel = makeViewModel(nearbyAlerts: MockNearbyAlerts(enabled: true))
         await viewModel.load()
-        #expect(viewModel.nearby?.users.count == 2)
+        #expect(viewModel.nearby?.users.count == 3)
+        #expect(viewModel.openNoteRequestCount == 1)
 
         await viewModel.setNearbyAlerts(false)
         #expect(!viewModel.isNearbyEnabled)
@@ -370,7 +375,7 @@ struct NearbyAlertsServiceTests {
         _ = await service.enable()
 
         let result = try await service.refreshInForeground()
-        #expect(result.users.count == 2)
+        #expect(result.users.count == 3)
 
         await service.performBackgroundCheck()
         #expect(notifications.posted.isEmpty)
@@ -414,5 +419,229 @@ struct NearbyContractTests {
         #expect(update.path == "users/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11/location")
         #expect(Endpoint.nearby(for: userId, radiusMeters: 1600).queryItems == [URLQueryItem(name: "radiusMeters", value: "1600")])
         #expect(Endpoint.people.path == "feed")
+    }
+}
+
+@MainActor
+struct NoteActivityTrackerTests {
+    private let sam = SampleData.people[0], jo = SampleData.people[1]
+
+    private func inbox(incoming: [NoteRequest] = [], outgoing: [NoteRequest] = []) -> NoteInbox {
+        NoteInbox(incoming: incoming, outgoing: outgoing)
+    }
+
+    @Test func firstPollRecordsWithoutAnnouncing() {
+        let request = SampleData.noteRequest(direction: .incoming, with: sam)
+        let (changes, state) = NoteActivityTracker.diff(inbox(incoming: [request]), since: NoteActivityState())
+        #expect(changes.isEmpty)
+        #expect(state.hasBaseline)
+        #expect(state.announcedRequestIds == [request.id])
+    }
+
+    @Test func newRequestAndNewReplyAreAnnouncedOnce() {
+        let (_, baseline) = NoteActivityTracker.diff(inbox(), since: NoteActivityState())
+        let request = SampleData.noteRequest(direction: .incoming, with: sam)
+        let reply = SampleData.noteRequest(direction: .outgoing, with: jo, status: .answered,
+                                           reply: .init(text: "Here!", placeLabel: nil, location: nil, respondedAt: .now))
+        let now = inbox(incoming: [request], outgoing: [reply])
+
+        let (changes, state) = NoteActivityTracker.diff(now, since: baseline)
+        #expect(changes.newRequests == [request])
+        #expect(changes.newAnswers == [reply])
+
+        let (again, _) = NoteActivityTracker.diff(now, since: state)
+        #expect(again.isEmpty)
+    }
+
+    @Test func pendingOutgoingIsNotAnAnswer() {
+        let (_, baseline) = NoteActivityTracker.diff(inbox(), since: NoteActivityState())
+        let waiting = SampleData.noteRequest(direction: .outgoing, with: jo)
+        let (changes, _) = NoteActivityTracker.diff(inbox(outgoing: [waiting]), since: baseline)
+        #expect(changes.isEmpty)
+    }
+
+    @Test func messages() {
+        let request = SampleData.noteRequest(direction: .incoming, with: sam)
+        #expect(NoteNotificationMessage.request(request).title == "Sam asked for a note")
+        #expect(NoteNotificationMessage.request(request).body == "Let them know where you are. They're also grabbing coffee nearby.")
+
+        let answered = SampleData.noteInbox.outgoing[0]
+        let message = NoteNotificationMessage.answer(answered)
+        #expect(message.title == "Jo sent you a note")
+        #expect(message.body == "Come find me, I saved you a seat · PCL, 3rd floor · 📍 Location shared")
+
+        var declined = SampleData.noteRequest(direction: .outgoing, with: jo)
+        declined.status = .declined
+        #expect(NoteNotificationMessage.answer(declined).title == "Jo can't share right now")
+    }
+}
+
+@MainActor
+struct NoteRequestMonitorTests {
+    @Test func notifiesAboutNewRequestsOnlyAfterBaselineAndOnlyWhenAsked() async throws {
+        let api = MockNoteRequestService()
+        api.inbox = .empty
+        let notifications = MockNotificationService()
+        let defaults = UserDefaults(suiteName: "NoteRequestMonitorTests-\(UUID().uuidString)")!
+        let monitor = NoteRequestMonitor(account: MockAccountService(), api: api, notifications: notifications, defaults: defaults)
+
+        _ = try await monitor.poll(notify: true)
+        api.inbox = SampleData.noteInbox
+        _ = try await monitor.poll(notify: false)
+        #expect(notifications.posted.isEmpty)
+
+        api.inbox.incoming.append(SampleData.noteRequest(direction: .incoming, with: SampleData.people[3]))
+        _ = try await monitor.poll(notify: true)
+        #expect(notifications.posted.count == 1)
+        #expect(notifications.posted.first?.route == .notes)
+        #expect(notifications.posted.first?.title == "Marcus asked for a note")
+    }
+}
+
+@MainActor
+struct NearbyPeopleViewModelTests {
+    private func makeViewModel(alertsEnabled: Bool = true) -> (NearbyPeopleViewModel, MockNoteRequestService) {
+        let notes = MockNoteRequestService()
+        notes.inbox = .empty
+        var services = Services.mock()
+        services = Services(account: services.account, activities: services.activities, statuses: services.statuses,
+                            people: services.people, nearbyAlerts: MockNearbyAlerts(enabled: alertsEnabled),
+                            noteRequests: notes, noteMonitor: MockNoteRequestMonitor(service: notes),
+                            location: services.location, router: services.router, widgets: services.widgets)
+        return (NearbyPeopleViewModel(user: SampleData.user, services: services), notes)
+    }
+
+    @Test func loadsClosestFirstAndSelectsClosestThree() async {
+        let (viewModel, _) = makeViewModel()
+        await viewModel.load()
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.people.map(\.distanceMeters) == [200, 400, 600])
+
+        viewModel.selectClosest()
+        #expect(viewModel.selection == Set(viewModel.people.prefix(3).map(\.id)))
+    }
+
+    @Test func sendingMarksPeopleAskedAndClearsSelection() async {
+        let (viewModel, notes) = makeViewModel()
+        await viewModel.load()
+        let closest = viewModel.people[0]
+        viewModel.toggle(closest)
+        await viewModel.sendRequests()
+
+        #expect(notes.requestedRecipients == [closest.id])
+        #expect(viewModel.isAsked(closest))
+        #expect(viewModel.selection.isEmpty)
+        #expect(viewModel.confirmation == "Asked Sam. You'll get a notification when they reply.")
+
+        viewModel.toggle(closest)
+        #expect(viewModel.selection.isEmpty)
+    }
+
+    @Test func alertsOffExplainsInsteadOfLoading() async {
+        let (viewModel, _) = makeViewModel(alertsEnabled: false)
+        await viewModel.load()
+        #expect(viewModel.loadState == .alertsOff)
+    }
+}
+
+@MainActor
+struct NotesInboxViewModelTests {
+    private func makeViewModel(location: MockLocationProvider? = nil) -> NotesInboxViewModel {
+        let base = Services.mock()
+        let services = Services(account: base.account, activities: base.activities, statuses: base.statuses, people: base.people,
+                                nearbyAlerts: base.nearbyAlerts, noteRequests: base.noteRequests, noteMonitor: base.noteMonitor,
+                                location: location ?? MockLocationProvider(), router: base.router, widgets: base.widgets)
+        return NotesInboxViewModel(user: SampleData.user, services: services)
+    }
+
+    @Test func replyWithLocationAnswersTheRequest() async {
+        let viewModel = makeViewModel()
+        await viewModel.load()
+        let request = viewModel.inbox.incoming[0]
+        viewModel.startReply(to: request)
+        viewModel.draft.text = "  By the fountain  "
+        viewModel.draft.placeLabel = "Main Mall"
+        viewModel.draft.includeLocation = true
+
+        #expect(await viewModel.sendReply())
+        let answered = viewModel.inbox.incoming[0]
+        #expect(answered.status == .answered)
+        #expect(answered.reply?.text == "By the fountain")
+        #expect(answered.reply?.placeLabel == "Main Mall")
+        #expect(answered.reply?.location?.latitude == 30.2849)
+        #expect(viewModel.replyingTo == nil)
+    }
+
+    @Test func replyWithoutLocationSendsNoPosition() async {
+        let viewModel = makeViewModel()
+        await viewModel.load()
+        viewModel.startReply(to: viewModel.inbox.incoming[0])
+        viewModel.draft.text = "Library"
+        #expect(await viewModel.sendReply())
+        #expect(viewModel.inbox.incoming[0].reply?.location == nil)
+    }
+
+    @Test func locationUnavailableKeepsSheetOpenWithError() async {
+        let location = MockLocationProvider()
+        location.lastKnown = nil
+        let viewModel = makeViewModel(location: location)
+        await viewModel.load()
+        viewModel.startReply(to: viewModel.inbox.incoming[0])
+        viewModel.draft.text = "Here"
+        viewModel.draft.includeLocation = true
+
+        #expect(!(await viewModel.sendReply()))
+        #expect(viewModel.replyingTo != nil)
+        #expect(viewModel.errorMessage != nil)
+        #expect(viewModel.inbox.incoming[0].status == .pending)
+    }
+
+    @Test func declining() async {
+        let viewModel = makeViewModel()
+        await viewModel.load()
+        await viewModel.decline(viewModel.inbox.incoming[0])
+        #expect(viewModel.inbox.incoming[0].status == .declined)
+    }
+}
+
+@MainActor
+struct NoteRequestContractTests {
+    @Test func decodesInbox() throws {
+        let json = Data(#"""
+        {"incoming":[{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f20","direction":"INCOMING",
+          "otherUser":{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11","firstName":"Ada","lastName":"L","nickname":null},
+          "activity":{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f12","name":"Coding","iconId":null,"isCustom":false},
+          "status":"PENDING","isExpired":false,"createdAt":"2026-10-25T08:00:00.000Z","expiresAt":"2099-10-25T11:00:00.000Z","reply":null}],
+         "outgoing":[{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f21","direction":"OUTGOING",
+          "otherUser":{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f13","firstName":"Bo","lastName":"M","nickname":"B"},
+          "activity":null,"status":"ANSWERED","isExpired":false,"createdAt":"2026-10-25T08:00:00.000Z","expiresAt":"2026-10-25T11:00:00.000Z",
+          "reply":{"text":"PCL","placeLabel":null,"location":{"latitude":30.2827,"longitude":-97.7381},"respondedAt":"2026-10-25T08:05:00.000Z"}}]}
+        """#.utf8)
+        let inbox = try JSONDecoder.api.decode(NoteInbox.self, from: json)
+        #expect(inbox.incoming.first?.isOpen == true)
+        #expect(inbox.openIncomingCount == 1)
+        #expect(inbox.outgoing.first?.reply?.location?.longitude == -97.7381)
+        #expect(inbox.outgoing.first?.otherUser.displayName == "B")
+    }
+
+    @Test func nearbyUsersCarryDistance() throws {
+        let json = Data(#"{"activity":null,"radiusMeters":1600,"users":[{"id":"7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11","firstName":"Ada","lastName":"L","nickname":null,"status":null,"distanceMeters":300}]}"#.utf8)
+        #expect(try JSONDecoder.api.decode(NearbyResult.self, from: json).users.first?.distanceMeters == 300)
+    }
+
+    @Test func routes() throws {
+        let userId = UUID(uuidString: "7F1B7C4E-8A0E-4C55-9D0E-0B6C2A1D9F11")!
+        let requestId = UUID(uuidString: "7F1B7C4E-8A0E-4C55-9D0E-0B6C2A1D9F20")!
+        #expect(Endpoint.noteRequests(for: userId).path == "users/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11/note-requests")
+        let reply = try Endpoint.replyToNoteRequest(requestId, reply: NoteReplyRequest(text: "hi"), for: userId)
+        #expect(reply.method == .post)
+        #expect(reply.path == "users/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11/note-requests/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f20/reply")
+        #expect(Endpoint.declineNoteRequest(requestId, for: userId).path.hasSuffix("/decline"))
+        let body = try #require(try JSONSerialization.jsonObject(with: reply.body ?? Data()) as? [String: Any])
+        #expect(Set(body.keys) == ["text"])
+    }
+
+    @Test func distanceText() {
+        #expect(DistanceText.approximate(300).hasPrefix("~"))
     }
 }

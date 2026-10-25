@@ -27,8 +27,11 @@ struct Impromptu_appApp: App {
                 .environment(\.services, services)
                 .environment(session)
         }
-        .backgroundTask(.appRefresh(NearbyAlertsService.backgroundTaskIdentifier)) { [nearbyAlerts = services.nearbyAlerts] in
+        .backgroundTask(.appRefresh(NearbyAlertsService.backgroundTaskIdentifier)) {
+            [nearbyAlerts = services.nearbyAlerts, noteMonitor = services.noteMonitor] in
             await nearbyAlerts.performBackgroundCheck()
+            // Also the only chance to hear about note requests and replies while the app is closed.
+            _ = try? await noteMonitor.poll(notify: true)
         }
     }
 }

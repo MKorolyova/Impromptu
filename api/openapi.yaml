@@ -377,8 +377,9 @@ paths:
       summary: People nearby doing the same activity
       description: |
         People whose last position (from the past 2 hours) is within `radiusMeters` of the user's, and
-        whose current status has the same activity as the user's. Empty when the user has no active status
-        or no recent position. Never includes positions or distances.
+        whose current status has the same activity as the user's, closest first. Empty when the user has no
+        active status or no recent position. Each user has `distanceMeters`, rounded up to 100 m; positions
+        are never returned.
       operationId: listNearby
       parameters:
         - name: radiusMeters
@@ -405,6 +406,103 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/note-requests:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: The past day's note requests, received and sent
+      operationId: listNoteRequests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [incoming, outgoing]
+                properties:
+                  incoming: { type: array, items: { $ref: "#/components/schemas/NoteRequest" } }
+                  outgoing: { type: array, items: { $ref: "#/components/schemas/NoteRequest" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Ask people nearby for a note
+      description: |
+        Every recipient must currently be in the user's `nearby` results (nearby and doing the same
+        activity), or the whole request is refused with 403. Recipients who already have an open request
+        from the user are skipped and listed in `skippedRecipientIds`. Requests expire after 3 hours.
+      operationId: createNoteRequests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientIds]
+              properties:
+                recipientIds: { type: array, minItems: 1, maxItems: 10, items: { type: string, format: uuid } }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests, skippedRecipientIds]
+                properties:
+                  requests: { type: array, items: { $ref: "#/components/schemas/NoteRequest" } }
+                  skippedRecipientIds: { type: array, items: { type: string, format: uuid } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/note-requests/{requestId}/reply:
+    parameters:
+      - { $ref: "#/components/parameters/userId" }
+      - { $ref: "#/components/parameters/requestId" }
+    post:
+      summary: Answer a note request
+      description: Only the recipient, only while it's pending and unexpired. Location is optional.
+      operationId: replyToNoteRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplyToNoteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request]
+                properties: { request: { $ref: "#/components/schemas/NoteRequest" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/{userId}/note-requests/{requestId}/decline:
+    parameters:
+      - { $ref: "#/components/parameters/userId" }
+      - { $ref: "#/components/parameters/requestId" }
+    post:
+      summary: Decline a note request
+      operationId: declineNoteRequest
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request]
+                properties: { request: { $ref: "#/components/schemas/NoteRequest" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /users/{userId}/google-calendar:
     parameters: [{ $ref: "#/components/parameters/userId" }]
@@ -522,6 +620,7 @@ components:
     userId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
     activityId: { name: activityId, in: path, required: true, schema: { type: string, format: uuid } }
     statusId: { name: statusId, in: path, required: true, schema: { type: string, format: uuid } }
+    requestId: { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
 
   schemas:
     CreateUserRequest:
@@ -571,6 +670,53 @@ components:
         name: { type: string }
         iconId: { type: [string, "null"], format: uuid }
         isCustom: { type: boolean }
+
+    NoteRequest:
+      type: object
+      required: [id, direction, otherUser, activity, status, isExpired, createdAt, expiresAt, reply]
+      properties:
+        id: { type: string, format: uuid }
+        direction: { type: string, enum: [INCOMING, OUTGOING], description: INCOMING means the user was asked. }
+        otherUser:
+          type: object
+          required: [id, firstName, lastName, nickname]
+          properties:
+            id: { type: string, format: uuid }
+            firstName: { type: string }
+            lastName: { type: string }
+            nickname: { type: [string, "null"] }
+        activity:
+          oneOf:
+            - $ref: "#/components/schemas/ActivitySummary"
+            - { type: "null" }
+        status: { type: string, enum: [PENDING, ANSWERED, DECLINED] }
+        isExpired: { type: boolean, description: "Pending past expiresAt; can no longer be answered." }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        reply:
+          oneOf:
+            - type: object
+              required: [text, placeLabel, location, respondedAt]
+              properties:
+                text: { type: string }
+                placeLabel: { type: [string, "null"] }
+                location:
+                  oneOf:
+                    - type: object
+                      required: [latitude, longitude]
+                      properties: { latitude: { type: number }, longitude: { type: number } }
+                    - { type: "null" }
+                respondedAt: { type: string, format: date-time }
+            - { type: "null" }
+
+    ReplyToNoteRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 280 }
+        placeLabel: { type: [string, "null"], maxLength: 100, description: "e.g. PCL, 3rd floor" }
+        latitude: { type: [number, "null"], description: Send with longitude, or neither. }
+        longitude: { type: [number, "null"] }
 
     UserWithStatus:
       type: object

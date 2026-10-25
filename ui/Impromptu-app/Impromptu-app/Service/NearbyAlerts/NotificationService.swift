@@ -10,14 +10,19 @@ protocol NotificationPosting: AnyObject {
     /// Shows the system prompt the first time; returns whether notifications are allowed.
     func requestAuthorization() async -> Bool
     func isAuthorized() async -> Bool
-    func post(id: String, title: String, body: String) async
+    /// `route` is the screen tapping the notification opens.
+    func post(id: String, title: String, body: String, route: AppRoute) async
 }
 
-/// Local notifications, shown as banners even while the app is open.
+/// Local notifications, shown as banners even while the app is open. Tapping one sends its route to `AppRouter`.
 final class LocalNotificationService: NSObject, NotificationPosting, UNUserNotificationCenterDelegate {
-    private let center = UNUserNotificationCenter.current()
+    private nonisolated static let routeKey = "route"
 
-    override init() {
+    private let center = UNUserNotificationCenter.current()
+    private let router: AppRouter
+
+    init(router: AppRouter) {
+        self.router = router
         super.init()
         center.delegate = self
     }
@@ -31,12 +36,13 @@ final class LocalNotificationService: NSObject, NotificationPosting, UNUserNotif
         return status == .authorized || status == .provisional || status == .ephemeral
     }
 
-    func post(id: String, title: String, body: String) async {
+    func post(id: String, title: String, body: String, route: AppRoute) async {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
-        content.threadIdentifier = "nearby"
+        content.threadIdentifier = route.rawValue
+        content.userInfo = [Self.routeKey: route.rawValue]
         try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 
@@ -45,5 +51,13 @@ final class LocalNotificationService: NSObject, NotificationPosting, UNUserNotif
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let route = (response.notification.request.content.userInfo[Self.routeKey] as? String).flatMap(AppRoute.init(rawValue:))
+        await MainActor.run { router.pendingRoute = route }
     }
 }

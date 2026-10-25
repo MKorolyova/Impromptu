@@ -25,17 +25,20 @@ export async function deleteUserLocation(userId: string): Promise<boolean> {
   return deleted.length > 0;
 }
 
-// People whose position, reported after `freshSince`, is within `radiusMeters` of the user's own.
+export type NearbyUser = { userId: string; distanceMeters: number };
+
+// People whose position, reported after `freshSince`, is within `radiusMeters` of the user's own, closest first.
 // Empty when the user's own position is missing or older than `freshSince`.
-export async function findNearbyUserIds(
+export async function findNearbyUsers(
   userId: string,
   { radiusMeters, freshSince }: { radiusMeters: number; freshSince: Date },
-): Promise<string[]> {
+): Promise<NearbyUser[]> {
   const me = alias(userLocations, "me");
   // Points are stored as lon/lat; geography measures in meters on the globe.
   const asGeography = (geom: Column) => sql`ST_SetSRID(${geom}, 4326)::geography`;
-  const rows = await db
-    .select({ userId: userLocations.userId })
+  const distance = sql<number>`ST_Distance(${asGeography(userLocations.geom)}, ${asGeography(me.geom)})`;
+  return db
+    .select({ userId: userLocations.userId, distanceMeters: distance.mapWith(Number) })
     .from(userLocations)
     .innerJoin(me, and(eq(me.userId, userId), gt(me.updatedAt, freshSince)))
     .where(
@@ -44,6 +47,6 @@ export async function findNearbyUserIds(
         gt(userLocations.updatedAt, freshSince),
         sql`ST_DWithin(${asGeography(userLocations.geom)}, ${asGeography(me.geom)}, ${radiusMeters})`,
       ),
-    );
-  return rows.map((row) => row.userId);
+    )
+    .orderBy(distance);
 }

@@ -20,6 +20,14 @@ struct PersonCard: View {
                     Text(person.displayName)
                         .font(.headline)
                     Spacer()
+                    if let meters = person.distanceMeters {
+                        Text(DistanceText.approximate(meters))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tint)
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     Text(status.startedAt, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -9,19 +9,32 @@ import UIKit
 /// "Nearby, doing the same": the opt-in switch and the people within about a mile who match your activity.
 struct NearbySection: View {
     let viewModel: HomeViewModel
+    /// Opens the full list, to pick people and ask for a note.
+    let onShowPeople: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             toggleCard
             if viewModel.isNearbyEnabled, let nearby = viewModel.nearby, nearby.activity != nil {
-                ForEach(nearby.users) { person in
+                ForEach(nearby.users.prefix(Self.previewCount)) { person in
                     if let status = person.status {
                         PersonCard(person: person, status: status)
                     }
                 }
+                if !nearby.users.isEmpty {
+                    Button(action: onShowPeople) {
+                        Label("Ask people nearby for a note", systemImage: "bubble.left.and.text.bubble.right.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                }
             }
         }
     }
+
+    /// The rest are in the full list.
+    private static let previewCount = 3
 
     private var toggleCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -95,7 +108,7 @@ private struct NoticeView: View {
 #Preview {
     @Previewable @State var viewModel = HomeViewModel(user: SampleData.user, services: .mock())
     ScrollView {
-        NearbySection(viewModel: viewModel)
+        NearbySection(viewModel: viewModel, onShowPeople: {})
             .padding()
     }
     .background(Color.feedBackground)

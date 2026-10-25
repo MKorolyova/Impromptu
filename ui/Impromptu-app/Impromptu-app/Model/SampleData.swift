@@ -55,3 +55,36 @@ enum SampleData {
         ]
     }()
 }
+
+extension SampleData {
+    static func noteRequest(
+        direction: NoteRequest.Direction,
+        with person: Person,
+        status: NoteRequest.State = .pending,
+        reply: NoteRequest.Reply? = nil,
+        minutesAgo: Double = 5
+    ) -> NoteRequest {
+        let created = Date.now.addingTimeInterval(-minutesAgo * 60)
+        return NoteRequest(
+            id: UUID(),
+            direction: direction,
+            otherUser: UserProfile(id: person.id, firstName: person.firstName, lastName: person.lastName, nickname: person.nickname),
+            activity: person.status?.activity,
+            status: status,
+            isExpired: false,
+            createdAt: created,
+            expiresAt: created.addingTimeInterval(3 * 3600),
+            reply: reply
+        )
+    }
+
+    static let noteInbox = NoteInbox(
+        incoming: [noteRequest(direction: .incoming, with: people[0], minutesAgo: 2)],
+        outgoing: [
+            noteRequest(direction: .outgoing, with: people[1], status: .answered, reply: NoteRequest.Reply(
+                text: "Come find me, I saved you a seat", placeLabel: "PCL, 3rd floor",
+                location: NoteRequest.ReplyLocation(latitude: 30.2827, longitude: -97.7381), respondedAt: .now.addingTimeInterval(-60))),
+            noteRequest(direction: .outgoing, with: people[2], minutesAgo: 10),
+        ]
+    )
+}

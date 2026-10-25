@@ -31,6 +31,7 @@ export const StatusSource = pgEnum("status_source", ["MANUAL","CALENDAR","LOCATI
 export const SharingResource = pgEnum("sharing_resource", ["LOCATION", "NOTES"]);
 export const ShareLevel = pgEnum("share_level", ["NONE", "PLACE", "CITY", "EXACT"]);
 export const CalendarProvider = pgEnum("calendar_provider", ["GOOGLE"]);
+export const NoteRequestStatus = pgEnum("note_request_status", ["PENDING", "ANSWERED", "DECLINED"]);
 
 export const users = pgTable("users", {
     id: uuid().primaryKey().defaultRandom(),
@@ -155,6 +156,30 @@ export const userLocations = pgTable("user_locations", {
   (t) => [
     index().using("gist", t.geom),
     index().on(t.updatedAt),
+  ],
+);
+
+// One user asking someone nearby for a note; answered with text, and optionally a place and a position.
+export const noteRequests = pgTable("note_requests", {
+    id: uuid().primaryKey().defaultRandom(),
+    requesterId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+    recipientId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+    // The activity they were both doing when it was sent.
+    activityId: uuid().references(() => activities.id, { onDelete: "set null" }),
+    status: NoteRequestStatus().notNull().default("PENDING"),
+    replyText: text(),
+    replyPlaceLabel: text(),
+    replyGeom: geometry({ type: "point", mode: "xy", srid: 4326 }),
+    respondedAt: timestamptz(),
+    // A pending request can't be answered after this.
+    expiresAt: timestamptz().notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index().on(t.recipientId, t.createdAt),
+    index().on(t.requesterId, t.createdAt),
+    check("note_requests_not_self", sql`${t.requesterId} <> ${t.recipientId}`),
+    check("note_requests_answered_has_text", sql`${t.status} <> 'ANSWERED' OR ${t.replyText} IS NOT NULL`),
   ],
 );
 

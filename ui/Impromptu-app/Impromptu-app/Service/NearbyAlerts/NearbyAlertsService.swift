@@ -143,7 +143,7 @@ final class NearbyAlertsService: NearbyAlerting {
 
         let newPeople = result.users.filter { newIds.contains($0.id) }
         let message = NearbyAlertMessage(newPeople: newPeople, totalCount: result.users.count, activityName: activity.name)
-        await notifications.post(id: "nearby-\(UUID().uuidString)", title: message.title, body: message.body)
+        await notifications.post(id: "nearby-\(UUID().uuidString)", title: message.title, body: message.body, route: .nearbyPeople)
     }
 
     private func scheduleBackgroundCheck() {

@@ -101,7 +101,11 @@ final class MockPeopleService: PeopleServicing {
 
 final class MockNearbyService: NearbyServicing {
     var result = NearbyResult(activity: SampleData.activities[3].summary, radiusMeters: NearbyAlertsService.radiusMeters,
-                              users: Array(SampleData.people.prefix(2)))
+                              users: SampleData.people.prefix(3).enumerated().map { index, person in
+                                  var nearby = person
+                                  nearby.distanceMeters = (index + 1) * 200
+                                  return nearby
+                              })
     private(set) var sharedLocations: [Coordinate] = []
     private(set) var stopSharingCount = 0
 
@@ -136,11 +140,11 @@ final class MockLocationProvider: LocationProviding {
 
 final class MockNotificationService: NotificationPosting {
     var authorized = true
-    private(set) var posted: [(title: String, body: String)] = []
+    private(set) var posted: [(title: String, body: String, route: AppRoute)] = []
 
     func requestAuthorization() async -> Bool { authorized }
     func isAuthorized() async -> Bool { authorized }
-    func post(id: String, title: String, body: String) async { posted.append((title, body)) }
+    func post(id: String, title: String, body: String, route: AppRoute) async { posted.append((title, body, route)) }
 }
 
 /// For previews: alerts already on, with two matches.
@@ -162,6 +166,58 @@ final class MockNearbyAlerts: NearbyAlerting {
     func resume() {}
     func refreshInForeground() async throws -> NearbyResult { isEnabled ? result : .empty }
     func performBackgroundCheck() async {}
+}
+
+final class MockNoteRequestService: NoteRequestServicing {
+    var inbox = SampleData.noteInbox
+    private(set) var requestedRecipients: [UUID] = []
+
+    func fetchInbox(for userId: UUID) async throws -> NoteInbox { inbox }
+
+    func requestNotes(from recipientIds: [UUID], for userId: UUID) async throws -> CreateNoteRequestsResponse {
+        requestedRecipients += recipientIds
+        let created = recipientIds.compactMap { id in SampleData.people.first { $0.id == id } }
+            .map { SampleData.noteRequest(direction: .outgoing, with: $0, minutesAgo: 0) }
+        inbox.outgoing.insert(contentsOf: created, at: 0)
+        return CreateNoteRequestsResponse(requests: created, skippedRecipientIds: [])
+    }
+
+    func reply(to request: NoteRequest, text: String, placeLabel: String?, location: Coordinate?, for userId: UUID) async throws -> NoteRequest {
+        var answered = request
+        answered.status = .answered
+        answered.reply = NoteRequest.Reply(text: text, placeLabel: placeLabel,
+                                           location: location.map { .init(latitude: $0.latitude, longitude: $0.longitude) },
+                                           respondedAt: .now)
+        replace(answered)
+        return answered
+    }
+
+    func decline(_ request: NoteRequest, for userId: UUID) async throws -> NoteRequest {
+        var declined = request
+        declined.status = .declined
+        replace(declined)
+        return declined
+    }
+
+    private func replace(_ request: NoteRequest) {
+        if let index = inbox.incoming.firstIndex(where: { $0.id == request.id }) { inbox.incoming[index] = request }
+    }
+}
+
+final class MockNoteRequestMonitor: NoteRequestMonitoring {
+    let service: MockNoteRequestService
+    private(set) var pollCount = 0
+
+    init(service: MockNoteRequestService = MockNoteRequestService()) {
+        self.service = service
+    }
+
+    func poll(notify: Bool) async throws -> NoteInbox {
+        pollCount += 1
+        return service.inbox
+    }
+
+    func reset() {}
 }
 
 final class MockWidgetSyncService: WidgetSyncing {

@@ -21,11 +21,13 @@ final class SessionViewModel {
     private let account: AccountServicing
     private let widgets: WidgetSyncing
     private let nearbyAlerts: NearbyAlerting
+    private let noteMonitor: NoteRequestMonitoring
 
     init(services: Services) {
         account = services.account
         widgets = services.widgets
         nearbyAlerts = services.nearbyAlerts
+        noteMonitor = services.noteMonitor
     }
 
     var user: User? {
@@ -64,6 +66,7 @@ final class SessionViewModel {
         let nearbyAlerts = nearbyAlerts
         Task { await nearbyAlerts.disable(userId: userId) }
         account.signOut()
+        noteMonitor.reset()
         widgets.clear()
         state = .signedOut
     }

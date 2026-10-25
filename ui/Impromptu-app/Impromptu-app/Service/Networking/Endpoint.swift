@@ -59,6 +59,22 @@ extension Endpoint {
         delete("\(userPath(userId))/location")
     }
 
+    static func noteRequests(for userId: UUID) -> Endpoint {
+        get("\(userPath(userId))/note-requests")
+    }
+
+    static func createNoteRequests(_ request: CreateNoteRequestsRequest, for userId: UUID) throws -> Endpoint {
+        try post("\(userPath(userId))/note-requests", body: request)
+    }
+
+    static func replyToNoteRequest(_ requestId: UUID, reply: NoteReplyRequest, for userId: UUID) throws -> Endpoint {
+        try post("\(userPath(userId))/note-requests/\(requestId.pathComponent)/reply", body: reply)
+    }
+
+    static func declineNoteRequest(_ requestId: UUID, for userId: UUID) -> Endpoint {
+        Endpoint(method: .post, path: "\(userPath(userId))/note-requests/\(requestId.pathComponent)/decline")
+    }
+
     static func nearby(for userId: UUID, radiusMeters: Int) -> Endpoint {
         get("\(userPath(userId))/nearby", query: [URLQueryItem(name: "radiusMeters", value: String(radiusMeters))])
     }

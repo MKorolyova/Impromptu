@@ -7,26 +7,36 @@ import SwiftUI
 
 /// The feed: your account and status drop-down on top, then everyone else's statuses.
 struct HomeView: View {
+    private enum Sheet: Identifiable {
+        case activities
+        case nearbyPeople
+        case notes
+
+        var id: Self { self }
+    }
+
     @Environment(SessionViewModel.self) private var session
     @State private var viewModel: HomeViewModel
-    @State private var isBrowsingActivities = false
+    @State private var sheet: Sheet?
     @State private var isConfirmingDelete = false
+    private let services: Services
 
     private static let refreshInterval: Duration = .seconds(60)
 
     init(user: User, services: Services) {
         _viewModel = State(initialValue: HomeViewModel(user: user, services: services))
+        self.services = services
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    MyStatusCard(viewModel: viewModel) { isBrowsingActivities = true }
+                    MyStatusCard(viewModel: viewModel) { sheet = .activities }
                         .padding(.bottom, 8)
                     if viewModel.loadState == .loaded {
                         SectionHeader(title: "Nearby", count: viewModel.nearby?.users.count)
-                        NearbySection(viewModel: viewModel)
+                        NearbySection(viewModel: viewModel) { sheet = .nearbyPeople }
                             .padding(.bottom, 8)
                     }
                     feed
@@ -37,6 +47,9 @@ struct HomeView: View {
             .background(Color.feedBackground)
             .navigationTitle("Impromptu")
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    notesButton
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     accountMenu
                 }
@@ -50,18 +63,34 @@ struct HomeView: View {
                     await viewModel.load()
                 }
             }
-            .sheet(isPresented: $isBrowsingActivities) {
-                ActivityPickerView(
-                    activities: viewModel.activities,
-                    selected: viewModel.draft.activity,
-                    onSelect: { viewModel.draft.activity = $0 },
-                    onCreate: { name, minutes in
-                        await viewModel.createActivity(name: name, durationMinutes: minutes)
-                    },
-                    onDelete: { activity in
-                        Task { await viewModel.deleteActivity(activity) }
-                    }
-                )
+            .sheet(item: $sheet, onDismiss: refreshAfterSheet) { sheet in
+                switch sheet {
+                case .activities:
+                    ActivityPickerView(
+                        activities: viewModel.activities,
+                        selected: viewModel.draft.activity,
+                        onSelect: { viewModel.draft.activity = $0 },
+                        onCreate: { name, minutes in
+                            await viewModel.createActivity(name: name, durationMinutes: minutes)
+                        },
+                        onDelete: { activity in
+                            Task { await viewModel.deleteActivity(activity) }
+                        }
+                    )
+                case .nearbyPeople:
+                    NearbyPeopleView(user: viewModel.user, services: services) { self.sheet = .notes }
+                case .notes:
+                    NotesInboxView(user: viewModel.user, services: services)
+                }
+            }
+            // A tapped notification, including one that launched the app before this view existed.
+            .onChange(of: services.router.pendingRoute, initial: true) { _, route in
+                guard let route else { return }
+                services.router.pendingRoute = nil
+                sheet = switch route {
+                case .nearbyPeople: .nearbyPeople
+                case .notes: .notes
+                }
             }
             .confirmationDialog("Delete your account?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
                 Button("Delete Account", role: .destructive) {
@@ -131,6 +160,35 @@ struct HomeView: View {
                     .cardBackground()
                 }
             }
+        }
+    }
+
+    private var notesButton: some View {
+        Button {
+            sheet = .notes
+        } label: {
+            Label("Notes", systemImage: viewModel.openNoteRequestCount > 0 ? "tray.full.fill" : "tray")
+        }
+        .overlay(alignment: .topTrailing) {
+            if viewModel.openNoteRequestCount > 0 {
+                Text("\(viewModel.openNoteRequestCount)")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(.red, in: Capsule())
+                    .offset(x: 8, y: -6)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityValue(viewModel.openNoteRequestCount > 0 ? "\(viewModel.openNoteRequestCount) waiting" : "")
+    }
+
+    /// Requests and replies may have changed while a sheet was up.
+    private func refreshAfterSheet() {
+        Task {
+            await viewModel.refreshNotes()
+            await viewModel.refreshNearby()
         }
     }
 
