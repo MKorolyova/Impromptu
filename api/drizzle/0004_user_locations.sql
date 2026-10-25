@@ -1,6 +1,6 @@
 CREATE TABLE "user_locations" (
 	"user_id" uuid PRIMARY KEY NOT NULL,
-	"geom" geometry(point) NOT NULL,
+	"geom" geometry(point, 4326) NOT NULL,
 	"accuracy_meters" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL

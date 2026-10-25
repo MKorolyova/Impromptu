@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
-    "db:seed": "node --env-file=.env src/db/seed.ts"
+    "db:seed": "node --env-file=.env src/db/seed.ts",
+    "db:migrate:deploy": "drizzle-kit migrate"
   },
   "dependencies": {
     "crypto": "^1.0.1",
