@@ -238,11 +238,11 @@ struct RegistrationViewModelTests {
         let viewModel = RegistrationViewModel(services: services)
         await makeAccount(viewModel, session: session)
 
-        SampleData.activities.prefix(4).forEach(viewModel.toggle)
+        viewModel.activities.prefix(4).forEach(viewModel.toggle)
         #expect(!viewModel.canContinue)
         #expect(viewModel.remainingActivityCount == 1)
 
-        viewModel.toggle(SampleData.activities[4])
+        viewModel.toggle(viewModel.activities[4])
         #expect(viewModel.canContinue)
         await viewModel.advance(session: session)
 
@@ -250,6 +250,30 @@ struct RegistrationViewModelTests {
         let savedNames = Set(activities.activities.filter { activities.savedIds.contains($0.id) }.map(\.name))
         #expect(savedNames.isSuperset(of: RegistrationViewModel.defaultActivityNames))
         #expect(activities.savedIds.count == 7)
+        #expect(activities.savedStandardNames == SampleData.activities.prefix(5).map(\.name))
+    }
+
+    @Test func standardListComesFromBuiltInEndpointEvenWithEmptyDatabase() async {
+        activities.activities = []
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        #expect(viewModel.hasLoadedActivities)
+        #expect(viewModel.activities.map(\.name) == activities.standardActivities.map(\.name))
+        #expect(viewModel.activities.allSatisfy { !$0.isCustom })
+    }
+
+    @Test func customActivitiesFromDatabaseGoOnTop() async {
+        let mine = Activity(id: UUID(), ownerId: UUID(), name: "Robotics club", iconId: nil, defaultDurationMinutes: 90, isCustom: true)
+        activities.activities.append(mine)
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await makeAccount(viewModel, session: session)
+
+        #expect(viewModel.activities.first?.customId == mine.id)
+        // Standard rows from the database aren't used; only the built-in list.
+        #expect(viewModel.activities.count == 1 + activities.standardActivities.count)
     }
 
     @Test func searchWithNoMatchOffersAdd() async {
@@ -294,7 +318,7 @@ struct RegistrationViewModelTests {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
         await makeAccount(viewModel, session: session)
-        SampleData.activities.prefix(5).forEach(viewModel.toggle)
+        viewModel.activities.prefix(5).forEach(viewModel.toggle)
         await viewModel.advance(session: session)
         await viewModel.advance(session: session)
         #expect(viewModel.step == .statusSources)

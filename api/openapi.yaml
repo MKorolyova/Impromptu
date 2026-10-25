@@ -318,7 +318,10 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     put:
       summary: Replace the user's picked activities
-      description: Every id must be a standard activity or one of the user's own, or nothing is saved.
+      description: |
+        Send at least one of `activityIds` or `standardActivityNames`. Every id must be a standard activity or
+        one of the user's own, and every name must be in `GET /activities`, or nothing is saved. Standard
+        activities sent by name get their database row on first use, so this works on an unseeded database.
       operationId: replaceSavedActivities
       requestBody:
         required: true
@@ -326,14 +329,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [activityIds]
               properties:
                 activityIds:
                   type: array
-                  minItems: 1
                   maxItems: 200
                   items: { type: string, format: uuid }
-                  description: Duplicates are ignored.
+                  description: Database rows, typically the user's own activities. Duplicates are ignored.
+                standardActivityNames:
+                  type: array
+                  maxItems: 200
+                  items: { type: string }
+                  description: Names exactly as `GET /activities` lists them. Duplicates are ignored.
       responses:
         "200":
           description: The saved activities.

@@ -61,6 +61,13 @@ final class MockAccountService: AccountServicing {
 final class MockActivityService: ActivityServicing {
     var activities = SampleData.activities
     var savedIds: [UUID] = Array(SampleData.activities.prefix(5).map(\.id))
+    var standardActivities = SampleData.activities.map { StandardActivity(name: $0.name, defaultDurationMinutes: $0.defaultDurationMinutes) }
+    /// Standard names in the last save, before they were turned into rows.
+    private(set) var savedStandardNames: [String] = []
+
+    func fetchStandardActivities() async throws -> [StandardActivity] {
+        standardActivities
+    }
 
     func fetchActivities(for userId: UUID) async throws -> [Activity] {
         activities
@@ -81,8 +88,11 @@ final class MockActivityService: ActivityServicing {
         activities.filter { savedIds.contains($0.id) }
     }
 
-    func saveActivities(_ activityIds: [UUID], for userId: UUID) async throws -> [Activity] {
-        savedIds = activityIds
+    func saveActivities(customIds: [UUID], standardNames: [String], for userId: UUID) async throws -> [Activity] {
+        savedStandardNames = standardNames
+        // Like the server: a standard name resolves to its row, which exists after first use.
+        let standardIds = standardNames.compactMap { name in activities.first { !$0.isCustom && $0.name == name }?.id }
+        savedIds = customIds + standardIds
         return try await fetchSavedActivities(for: userId)
     }
 }

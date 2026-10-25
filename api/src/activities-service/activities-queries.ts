@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db, withTransaction } from "@/db/index";
 import { activities, userActivities } from "@/db/schema";
+import type { ActivityDefinition } from "@/types/activity";
 import type { CreateCustomActivityRequest } from "@/validators/activities";
 
 const activityColumns = {
@@ -81,6 +82,23 @@ export async function getStandardActivityByName(name: string): Promise<PublicAct
     .where(and(isStandard, eq(activities.name, name)))
     .limit(1);
   return activity ?? null;
+}
+
+// Standard activities live in constants/activities.ts. Their database rows, which statuses and saved
+// activities point at, are created the first time they're needed, so nothing depends on db:seed having run.
+// Returns the rows' ids in the same order as `definitions`.
+export async function ensureStandardActivities(definitions: readonly ActivityDefinition[]): Promise<string[]> {
+  if (definitions.length === 0) return [];
+  await db
+    .insert(activities)
+    .values(definitions.map(({ name, defaultDurationMinutes }) => ({ name, defaultDurationMinutes })))
+    .onConflictDoNothing({ target: activities.name, where: sql`${activities.ownerId} IS NULL` });
+  const rows = await db
+    .select({ id: activities.id, name: activities.name })
+    .from(activities)
+    .where(and(isStandard, inArray(activities.name, definitions.map((definition) => definition.name))));
+  const idByName = new Map(rows.map((row) => [row.name, row.id]));
+  return definitions.flatMap((definition) => idByName.get(definition.name) ?? []);
 }
 
 // The activities the user picked as their own, in the same order as listActivitiesForUser.

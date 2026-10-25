@@ -50,11 +50,14 @@ final class RegistrationViewModel {
     var nickname = ""
 
     var query = ""
-    /// Everything the user can pick: their custom activities, then the standard ones.
-    private(set) var activities: [Activity] = []
+    /// Everything the user can pick: their own activities (from the database) on top, then the
+    /// standard ones (the built-in list from `GET /activities`).
+    private(set) var activities: [ActivityChoice] = []
     /// Picked activities, in the order they were picked. Excludes the defaults.
-    private(set) var selectedIds: [UUID] = []
+    private(set) var selectedIds: [ActivityChoice.ID] = []
     private(set) var activitiesLoadError: String?
+    /// The list has come back, even if it was empty.
+    private(set) var hasLoadedActivities = false
     private(set) var isAddingActivity = false
 
     private(set) var calendarState: CalendarState = .notConnected
@@ -181,7 +184,12 @@ final class RegistrationViewModel {
         guard let user else { return }
         activitiesLoadError = nil
         do {
-            activities = try await services.activities.fetchActivities(for: user.id)
+            async let standard = services.activities.fetchStandardActivities()
+            // Only the user's own come from the database; a brand-new account usually has none.
+            async let rows = services.activities.fetchActivities(for: user.id)
+            let custom = ((try? await rows) ?? []).filter(\.isCustom)
+            activities = custom.map(ActivityChoice.init(custom:)) + (try await standard).map(ActivityChoice.init(standard:))
+            hasLoadedActivities = true
         } catch {
             activitiesLoadError = error.localizedDescription
         }
@@ -192,13 +200,13 @@ final class RegistrationViewModel {
     }
 
     /// Matches for the search, without the defaults (they're always included).
-    var searchResults: [Activity] {
+    var searchResults: [ActivityChoice] {
         let pickable = activities.filter { !Self.isDefaultActivity($0.name) }
         guard !trimmedQuery.isEmpty else { return pickable }
         return pickable.filter { $0.name.localizedCaseInsensitiveContains(trimmedQuery) }
     }
 
-    var selectedActivities: [Activity] {
+    var selectedActivities: [ActivityChoice] {
         selectedIds.compactMap { id in activities.first { $0.id == id } }
     }
 
@@ -217,11 +225,11 @@ final class RegistrationViewModel {
         max(0, Self.requiredActivityCount - selectedIds.count)
     }
 
-    func isSelected(_ activity: Activity) -> Bool {
+    func isSelected(_ activity: ActivityChoice) -> Bool {
         selectedIds.contains(activity.id)
     }
 
-    func toggle(_ activity: Activity) {
+    func toggle(_ activity: ActivityChoice) {
         if let index = selectedIds.firstIndex(of: activity.id) {
             selectedIds.remove(at: index)
         } else {
@@ -235,8 +243,8 @@ final class RegistrationViewModel {
         isAddingActivity = true
         defer { isAddingActivity = false }
         do {
-            let activity = try await services.activities.createActivity(
-                name: trimmedQuery, durationMinutes: Self.customActivityMinutes, for: user.id)
+            let activity = ActivityChoice(custom: try await services.activities.createActivity(
+                name: trimmedQuery, durationMinutes: Self.customActivityMinutes, for: user.id))
             activities.insert(activity, at: 0)
             selectedIds.append(activity.id)
             query = ""
@@ -251,18 +259,26 @@ final class RegistrationViewModel {
         isWorking = true
         defer { isWorking = false }
         do {
+            // The defaults are the user's own rows; reuse them if a previous attempt already made them.
             var defaultIds: [UUID] = []
             for item in Self.defaultActivities {
-                if let existing = activities.first(where: { $0.name.caseInsensitiveCompare(item.name) == .orderedSame }) {
-                    defaultIds.append(existing.id)
+                if let existing = activities.first(where: {
+                    $0.isCustom && $0.name.caseInsensitiveCompare(item.name) == .orderedSame
+                })?.customId {
+                    defaultIds.append(existing)
                 } else {
                     let created = try await services.activities.createActivity(
                         name: item.name, durationMinutes: item.durationMinutes, for: user.id)
-                    activities.insert(created, at: 0)
+                    activities.insert(ActivityChoice(custom: created), at: 0)
                     defaultIds.append(created.id)
                 }
             }
-            _ = try await services.activities.saveActivities(defaultIds + selectedIds, for: user.id)
+            let picked = selectedActivities
+            _ = try await services.activities.saveActivities(
+                customIds: defaultIds + picked.compactMap(\.customId),
+                standardNames: picked.filter { !$0.isCustom }.map(\.name),
+                for: user.id
+            )
             return true
         } catch {
             errorMessage = error.localizedDescription

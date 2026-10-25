@@ -99,6 +99,9 @@ extension Endpoint {
         delete(userPath(userId))
     }
 
+    /// The built-in list of standard activities; no user or database needed.
+    static let standardActivities = get("activities")
+
     static func savedActivities(for userId: UUID) -> Endpoint {
         get("\(userPath(userId))/saved-activities")
     }

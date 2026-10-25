@@ -40,5 +40,54 @@ struct CreateActivityRequest: Encodable {
 
 /// Body of `PUT /users/{userId}/saved-activities`.
 struct ReplaceSavedActivitiesRequest: Encodable {
+    /// The user's own activities (database rows).
     var activityIds: [UUID]
+    /// Standard activities by name, as `GET /activities` lists them; the server finds or creates their rows.
+    var standardActivityNames: [String] = []
+}
+
+/// An entry of `GET /activities`: the built-in list of standard activities. No id until someone uses it.
+struct StandardActivity: Decodable, Hashable {
+    var name: String
+    var defaultDurationMinutes: Int
+}
+
+/// Something to pick at sign-up: a standard activity from the built-in list, or one of the user's own.
+struct ActivityChoice: Identifiable, Hashable {
+    enum Source: Hashable {
+        case standard
+        /// A database row the user created.
+        case custom(UUID)
+    }
+
+    let name: String
+    let defaultDurationMinutes: Int
+    let source: Source
+
+    var id: String {
+        switch source {
+        case .standard: "standard:\(name)"
+        case .custom(let id): "custom:\(id.uuidString)"
+        }
+    }
+
+    var isCustom: Bool {
+        if case .custom = source { true } else { false }
+    }
+
+    var customId: UUID? {
+        if case .custom(let id) = source { id } else { nil }
+    }
+
+    init(standard: StandardActivity) {
+        name = standard.name
+        defaultDurationMinutes = standard.defaultDurationMinutes
+        source = .standard
+    }
+
+    init(custom activity: Activity) {
+        name = activity.name
+        defaultDurationMinutes = activity.defaultDurationMinutes
+        source = .custom(activity.id)
+    }
 }

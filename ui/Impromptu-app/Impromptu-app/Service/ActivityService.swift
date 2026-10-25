@@ -6,15 +6,21 @@
 import Foundation
 
 protocol ActivityServicing {
-    /// The user's custom activities first, then the standard ones.
+    /// The built-in list (`GET /activities`), in its curated order. Not from the database.
+    func fetchStandardActivities() async throws -> [StandardActivity]
+    /// The user's custom activities first, then the standard ones (database rows).
     func fetchActivities(for userId: UUID) async throws -> [Activity]
     func createActivity(name: String, durationMinutes: Int, for userId: UUID) async throws -> Activity
     /// Only custom activities can be deleted; the server returns 403 otherwise.
     func deleteActivity(_ activity: Activity, for userId: UUID) async throws
     /// The ones the user picked as their own at sign-up; empty if they never did.
     func fetchSavedActivities(for userId: UUID) async throws -> [Activity]
-    /// Replaces the picked activities and returns them.
-    func saveActivities(_ activityIds: [UUID], for userId: UUID) async throws -> [Activity]
+    /// Replaces the picked activities and returns them. Standard ones go by name.
+    func saveActivities(customIds: [UUID], standardNames: [String], for userId: UUID) async throws -> [Activity]
+}
+
+private struct StandardActivitiesEnvelope: Decodable {
+    var activities: [StandardActivity]
 }
 
 private struct ActivitiesEnvelope: Decodable {
@@ -30,6 +36,11 @@ final class ActivityService: ActivityServicing {
 
     init(client: APIClient) {
         self.client = client
+    }
+
+    func fetchStandardActivities() async throws -> [StandardActivity] {
+        let envelope: StandardActivitiesEnvelope = try await client.send(.standardActivities)
+        return envelope.activities
     }
 
     func fetchActivities(for userId: UUID) async throws -> [Activity] {
@@ -52,8 +63,8 @@ final class ActivityService: ActivityServicing {
         return envelope.activities
     }
 
-    func saveActivities(_ activityIds: [UUID], for userId: UUID) async throws -> [Activity] {
-        let request = ReplaceSavedActivitiesRequest(activityIds: activityIds)
+    func saveActivities(customIds: [UUID], standardNames: [String], for userId: UUID) async throws -> [Activity] {
+        let request = ReplaceSavedActivitiesRequest(activityIds: customIds, standardActivityNames: standardNames)
         let envelope: ActivitiesEnvelope = try await client.send(.replaceSavedActivities(request, for: userId))
         return envelope.activities
     }

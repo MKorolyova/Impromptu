@@ -311,10 +311,12 @@ private struct ActivitiesStep: View {
                 Button("Try Again") { Task { await viewModel.loadActivities() } }
                     .buttonStyle(.brand(.secondary, compact: true))
             }
-        } else if viewModel.activities.isEmpty {
+        } else if !viewModel.hasLoadedActivities {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
+        } else if viewModel.searchResults.isEmpty, viewModel.trimmedQuery.isEmpty {
+            noActivities
         } else if viewModel.searchResults.isEmpty {
             emptySearch
         } else {
@@ -330,6 +332,21 @@ private struct ActivitiesStep: View {
             }
             .insetBackground()
         }
+    }
+
+    /// Nothing to pick from: the server has no standard activities (database not seeded).
+    private var noActivities: some View {
+        VStack(spacing: 6) {
+            Text("No activities to pick from yet")
+                .font(.subheadline.weight(.semibold))
+            Text("Type one above and tap Add to make your own.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .insetBackground()
     }
 
     private var emptySearch: some View {
@@ -358,7 +375,7 @@ private struct ActivitiesStep: View {
 }
 
 private struct ActivityResultRow: View {
-    let activity: Activity
+    let activity: ActivityChoice
     let isSelected: Bool
     let onToggle: () -> Void
 

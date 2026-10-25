@@ -34,13 +34,25 @@ export const createCustomActivityRequestSchema = z.object({
 });
 
 // Body of PUT /api/v1/users/{userId}/saved-activities. Duplicates are ignored.
-export const replaceSavedActivitiesRequestSchema = z.object({
-  activityIds: z
-    .array(z.uuid())
-    .min(1)
-    .max(200)
-    .transform((ids) => [...new Set(ids.map((id) => id.toLowerCase()))]),
-});
+// `activityIds` are database rows (the user's own activities); `standardActivityNames` are names from
+// GET /api/v1/activities, which have no ids until someone uses them.
+export const replaceSavedActivitiesRequestSchema = z
+  .object({
+    activityIds: z
+      .array(z.uuid())
+      .max(200)
+      .default([])
+      .transform((ids) => [...new Set(ids.map((id) => id.toLowerCase()))]),
+    standardActivityNames: z
+      .array(z.string().trim().min(1))
+      .max(200)
+      .default([])
+      .transform((names) => [...new Set(names)]),
+  })
+  .refine((body) => body.activityIds.length + body.standardActivityNames.length > 0, {
+    message: "Pick at least one activity",
+    path: ["activityIds"],
+  });
 
 export type Activity = z.infer<typeof activitySchema>;
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
