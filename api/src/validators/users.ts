@@ -38,6 +38,13 @@ export const listUsersQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
+// Body of POST /api/v1/auth/login.
+export const loginRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email()),
+  password: z.string().min(1).max(128),
+});
+
 export type User = z.infer<typeof userSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
+export type LoginRequest = z.infer<typeof loginRequestSchema>;

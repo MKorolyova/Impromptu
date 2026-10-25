@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/index";
 import { users } from "@/db/schema";
 import type { CreateUserInput } from "@/validators/users";
@@ -26,7 +26,24 @@ export type PublicUser = {
   updatedAt: Date;
 };
 
+// What other people may see about a user: no email or timezone.
+export type UserProfile = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  nickname: string | null;
+};
+
 const isActiveUser = (userId: string) => and(eq(users.id, userId), isNull(users.deletedAt));
+
+export function listUserProfiles({ limit = 200 }: { limit?: number } = {}): Promise<UserProfile[]> {
+  return db
+    .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, nickname: users.nickname })
+    .from(users)
+    .where(isNull(users.deletedAt))
+    .orderBy(asc(users.firstName), asc(users.lastName))
+    .limit(limit);
+}
 
 export async function createUser(input: CreateUserInput): Promise<PublicUser> {
   const [user] = await db.insert(users).values(input).returning(publicUserColumns);
@@ -66,6 +83,29 @@ export function listUsers({ limit, after }: { limit: number; after?: UsersCursor
     )
     .orderBy(asc(users.createdAt), asc(users.id))
     .limit(limit);
+}
+
+// For sign-in only; the hash must never leave the server.
+export async function getUserCredentialsByEmail(
+  email: string,
+): Promise<{ user: PublicUser; passwordHash: string } | null> {
+  const [row] = await db
+    .select({ ...publicUserColumns, passwordHash: users.passwordHash })
+    .from(users)
+    // Matches the lower(email) unique index.
+    .where(and(eq(sql`lower(${users.email})`, email.toLowerCase()), isNull(users.deletedAt)))
+    .limit(1);
+  if (!row) return null;
+  const { passwordHash, ...user } = row;
+  return { user, passwordHash };
+}
+
+export function getUserProfilesByIds(userIds: string[]): Promise<UserProfile[]> {
+  if (userIds.length === 0) return Promise.resolve([]);
+  return db
+    .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, nickname: users.nickname })
+    .from(users)
+    .where(and(inArray(users.id, userIds), isNull(users.deletedAt)));
 }
 
 // Returns false when the user doesn't exist or was already deleted.

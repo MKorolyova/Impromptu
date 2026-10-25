@@ -81,7 +81,7 @@ export function parseOrReject<T>(res: NextApiResponse, schema: z.ZodType<T>, inp
 
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
-// One handler per HTTP method, behind the API key, with errors in the standard shape.
+// One handler per HTTP method, behind the API key when one is set, with errors in the standard shape.
 // `public: true` skips the API key, for callers like Google that can't send it; such routes verify requests themselves.
 export function apiRoute(
   handlers: Partial<Record<Method, ApiHandler>>,

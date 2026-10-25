@@ -145,6 +145,19 @@ export const places = pgTable("places", {
   ],
 );
 
+// Each user's last reported position, for finding people nearby. Never returned to other users.
+export const userLocations = pgTable("user_locations", {
+    userId: uuid().primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    geom: geometry({ type: "point", mode: "xy", srid: 4326 }).notNull(),
+    accuracyMeters: integer(),
+    ...timestamps,
+  },
+  (t) => [
+    index().using("gist", t.geom),
+    index().on(t.updatedAt),
+  ],
+);
+
 export const calendarLinks = pgTable("calendar_links", {
     userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
     provider: CalendarProvider().notNull(),

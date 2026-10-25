@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "@/db/index";
 import { activities, statuses } from "@/db/schema";
 
@@ -68,6 +68,27 @@ export function listStatusesForUser(
     )
     .orderBy(desc(statuses.startedAt))
     .limit(limit);
+}
+
+// Each user's newest active status, keyed by user ID. Users without one are absent.
+export async function getCurrentStatuses(userIds: string[]): Promise<Map<string, PublicStatus>> {
+  const current = new Map<string, PublicStatus>();
+  if (userIds.length === 0) return current;
+  const now = new Date();
+  const rows = await selectStatuses()
+    .where(
+      and(
+        inArray(statuses.userId, userIds),
+        isNull(statuses.deletedAt),
+        lte(statuses.startedAt, now),
+        gt(statuses.expiresAt, now),
+      ),
+    )
+    .orderBy(desc(statuses.startedAt));
+  for (const status of rows) {
+    if (!current.has(status.userId)) current.set(status.userId, status);
+  }
+  return current;
 }
 
 export async function getStatusForUser(userId: string, statusId: string): Promise<PublicStatus | null> {

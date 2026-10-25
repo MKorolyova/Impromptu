@@ -15,9 +15,9 @@ export const env = {
   get DATABASE_URL() {
     return requireEnv("DATABASE_URL");
   },
-  // Shared key callers send as `Authorization: Bearer <API_KEY>`.
-  get API_KEY() {
-    return requireEnv("API_KEY");
+  // Shared key callers send as `Authorization: Bearer <API_KEY>`. Optional: unset means no key is required.
+  get API_KEY(): string | undefined {
+    return process.env.API_KEY || undefined;
   },
   get GOOGLE_CLIENT_ID() {
     return requireEnv("GOOGLE_CLIENT_ID");

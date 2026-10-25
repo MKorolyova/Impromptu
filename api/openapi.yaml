@@ -4,7 +4,8 @@ info:
   version: 1.0.0
   description: |
     Users, their activities, and statuses (an activity with an optional note and an expiry).
-    Every request needs `Authorization: Bearer <API_KEY>` until user sign-in exists.
+    When the server has `API_KEY` set, every request needs `Authorization: Bearer <API_KEY>`.
+    Without it, requests need no auth.
     Deletes are soft: the row stays in the database with `deletedAt` set and is no longer returned.
 
     ## Google Calendar statuses
@@ -18,6 +19,7 @@ info:
 servers:
   - url: http://localhost:3000/api/v1
 security:
+  - {}
   - apiKey: []
 
 paths:
@@ -130,6 +132,51 @@ paths:
                     items: { $ref: "#/components/schemas/User" }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /feed:
+    get:
+      summary: Everyone with their current status
+      description: |
+        Public profiles only (no email). People with an active status come first, most recently
+        started first; then everyone else by name. Up to 200 users.
+      operationId: getFeed
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users]
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: "#/components/schemas/UserWithStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/login:
+    post:
+      summary: Check an email and password
+      description: Returns the user on success. No session token is issued yet.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401":
+          description: Missing or invalid API key, or wrong email or password.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
   /users/{userId}:
     parameters: [{ $ref: "#/components/parameters/userId" }]
@@ -297,6 +344,68 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /users/{userId}/location:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    put:
+      summary: Report the user's current position
+      description: |
+        Used only to find people nearby; never returned to anyone. Positions older than 2 hours are
+        ignored, so people who stop reporting drop out of `nearby` on their own.
+      operationId: updateLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateLocationRequest" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Stop sharing the user's position
+      description: Removes the stored position (a hard delete).
+      operationId: deleteLocation
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/nearby:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: People nearby doing the same activity
+      description: |
+        People whose last position (from the past 2 hours) is within `radiusMeters` of the user's, and
+        whose current status has the same activity as the user's. Empty when the user has no active status
+        or no recent position. Never includes positions or distances.
+      operationId: listNearby
+      parameters:
+        - name: radiusMeters
+          in: query
+          schema: { type: integer, minimum: 50, maximum: 50000, default: 1600 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activity, radiusMeters, users]
+                properties:
+                  activity:
+                    description: The user's current activity, or null without an active status.
+                    oneOf:
+                      - $ref: "#/components/schemas/ActivitySummary"
+                      - { type: "null" }
+                  radiusMeters: { type: integer }
+                  users:
+                    type: array
+                    items: { $ref: "#/components/schemas/UserWithStatus" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /users/{userId}/google-calendar:
     parameters: [{ $ref: "#/components/parameters/userId" }]
     get:
@@ -400,14 +509,14 @@ paths:
       operationId: googleCalendarCallback
       security: []
       responses:
-        "302": { description: Redirect to APP_REDIRECT_URL with ?result=... }
+        "302": { description: "Redirect to APP_REDIRECT_URL with ?result=..." }
 
 components:
   securitySchemes:
     apiKey:
       type: http
       scheme: bearer
-      description: The server's API_KEY.
+      description: The server's API_KEY. Only required when the server sets one.
 
   parameters:
     userId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -426,6 +535,13 @@ components:
         nickname: { type: [string, "null"], minLength: 1, maxLength: 50 }
         timezone: { type: string, description: IANA name, e.g. America/Chicago. }
 
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, description: Matched ignoring case. }
+        password: { type: string, minLength: 1, maxLength: 128 }
+
     User:
       type: object
       required: [id, email, firstName, lastName, nickname, timezone, createdAt, updatedAt]
@@ -438,6 +554,37 @@ components:
         timezone: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    UpdateLocationRequest:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        accuracyMeters: { type: [number, "null"], minimum: 0 }
+
+    ActivitySummary:
+      type: object
+      required: [id, name, iconId, isCustom]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        iconId: { type: [string, "null"], format: uuid }
+        isCustom: { type: boolean }
+
+    UserWithStatus:
+      type: object
+      required: [id, firstName, lastName, nickname, status]
+      properties:
+        id: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        nickname: { type: [string, "null"] }
+        status:
+          description: The newest active status, or null.
+          oneOf:
+            - { $ref: "#/components/schemas/Status" }
+            - { type: "null" }
 
     CreateActivityRequest:
       type: object
@@ -498,7 +645,7 @@ components:
         id: { type: string }
         title: { type: [string, "null"] }
         location: { type: [string, "null"] }
-        startAt: { type: string, format: date-time, description: All-day events start at 00:00 UTC of their date. }
+        startAt: { type: string, format: date-time, description: "All-day events start at 00:00 UTC of their date." }
         endAt: { type: string, format: date-time }
         allDay: { type: boolean }
         status: { type: string, enum: [confirmed, tentative] }

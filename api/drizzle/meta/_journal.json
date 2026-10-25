@@ -29,6 +29,13 @@
       "when": 1792905833143,
       "tag": "0003_calendar_statuses_and_oauth_states",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792913452454,
+      "tag": "0004_user_locations",
+      "breakpoints": true
     }
   ]
 }
