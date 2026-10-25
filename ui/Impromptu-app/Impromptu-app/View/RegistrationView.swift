@@ -427,7 +427,7 @@ private struct CalendarStep: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 14) {
                 Benefit(systemImage: "calendar.badge.clock",
-                        text: "When an event starts, it becomes your status, like “In a meeting”.")
+                        text: "When an event starts, it becomes your status, like “Meeting”.")
                 Benefit(systemImage: "eye.slash",
                         text: "Event titles stay private. Friends only see the activity.")
                 Benefit(systemImage: "sun.max",

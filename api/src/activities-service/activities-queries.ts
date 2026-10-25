@@ -75,15 +75,6 @@ export async function softDeleteCustomActivity(userId: string, activityId: strin
   return deleted.length > 0;
 }
 
-export async function getStandardActivityByName(name: string): Promise<PublicActivity | null> {
-  const [activity] = await db
-    .select(activityColumns)
-    .from(activities)
-    .where(and(isStandard, eq(activities.name, name)))
-    .limit(1);
-  return activity ?? null;
-}
-
 // Standard activities live in constants/activities.ts. Their database rows, which statuses and saved
 // activities point at, are created the first time they're needed, so nothing depends on db:seed having run.
 // Returns the rows' ids in the same order as `definitions`.

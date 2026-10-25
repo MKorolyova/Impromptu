@@ -4,6 +4,10 @@ import type { CalendarEvent } from "@/types/calendar-event";
 import { localWeekdayAndTime } from "@/utils/time-zone";
 
 const ACTIVITY_NAMES = ACTIVITIES.map((activity) => activity.name);
+// Named by the prompt and the fallback rule, so they must stay in constants/activities.ts (a test checks).
+const MEETING = "Meeting";
+const FOCUS = "Deep focus";
+const ANYTHING_ELSE = "Working";
 // Matches Gemini's answer to a name even if capitals or spacing differ.
 const normalize = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
 const ACTIVITY_NAMES_BY_KEY = new Map(ACTIVITY_NAMES.map((name) => [normalize(name), name]));
@@ -16,14 +20,14 @@ export type CalendarEventClassification = {
 const SYSTEM_PROMPT = `You classify a calendar event into the one activity that best describes what the person is doing during it.
 You must answer with exactly one activity name from the allowed list, spelled exactly as listed.
 Use the title first, then the location, time of day, length, and whether other people are invited.
-If the event has other attendees or a video call and nothing more specific fits, choose "In a meeting".
-If nothing fits well, choose "Working".`;
+If the event has other attendees or a video call and nothing more specific fits, choose "${MEETING}".
+If nothing fits well, choose "${ANYTHING_ELSE}".`;
 
 // Used when Gemini isn't configured or fails, so a status is still created.
 function classifyByRule(event: CalendarEvent): string {
-  if (event.eventType === "focusTime") return "Deep focus";
-  if (event.hasOtherAttendees || event.videoCallUrl) return "In a meeting";
-  return "Working";
+  if (event.eventType === "focusTime") return FOCUS;
+  if (event.hasOtherAttendees || event.videoCallUrl) return MEETING;
+  return ANYTHING_ELSE;
 }
 
 // Picks one of the standard activities (constants/activities.ts) for an event.

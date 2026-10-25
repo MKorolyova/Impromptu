@@ -1,5 +1,6 @@
-import { getStandardActivityByName } from "@/activities-service/activities-queries";
+import { ensureStandardActivities } from "@/activities-service/activities-queries";
 import { classifyCalendarEvent } from "@/ai-service/classify-calendar-event";
+import { ACTIVITIES } from "@/constants/activities";
 import {
   deleteGoogleCalendarLink,
   listGoogleCalendarUsers,
@@ -108,16 +109,18 @@ async function startStatusForEvent(
   // Rate limited: leave it unhandled so the next minute's run tries again.
   if (!classification) return false;
   const { activityName } = classification;
-  const activity = await getStandardActivityByName(activityName);
-  if (!activity) {
+  const definition = ACTIVITIES.find((activity) => activity.name === activityName);
+  // The activity's row is made the first time anyone uses it, so this doesn't depend on db:seed.
+  const [activityId] = definition ? await ensureStandardActivities([definition]) : [];
+  if (!activityId) {
     schedule.handled.add(key);
-    console.error(`Standard activity "${activityName}" is missing; run pnpm db:seed`);
+    console.error(`Calendar classification picked "${activityName}", which isn't a standard activity`);
     return false;
   }
 
   const status = await createCalendarStatus({
     userId: user.userId,
-    activityId: activity.id,
+    activityId,
     googleEventId: event.id,
     startedAt,
     expiresAt: new Date(event.endAt),
