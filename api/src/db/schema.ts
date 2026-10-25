@@ -139,11 +139,17 @@ export const calendarLinks = pgTable("calendar_links", {
     provider: CalendarProvider().notNull(),
     encryptedRefreshToken: text().notNull(),
     syncToken: text(),
+    // Google push channel; resourceId is needed to stop it, token verifies its notifications.
     channelId: text(),
+    channelResourceId: text(),
+    channelToken: text(),
     channelExpiresAt: timestamptz(),
     ...timestamps,
   },
-  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+  (t) => [
+    primaryKey({ columns: [t.userId, t.provider] }),
+    uniqueIndex("calendar_links_channel_id_unique").on(t.channelId),
+  ],
 );
 
 export const conversations = pgTable("conversations", {

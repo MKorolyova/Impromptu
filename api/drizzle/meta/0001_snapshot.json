@@ -1,6 +1,6 @@
 {
-  "id": "950a5a3f-b8db-46ca-86a5-61cfdab72930",
-  "prevId": "b92b54d2-87da-487f-aad2-6ac4d0a7fab3",
+  "id": "2bced758-e8c5-4696-b948-7ae1a1eb34f4",
+  "prevId": "456daece-05c5-4bc5-9033-63f6ebbee4e7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -250,6 +250,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "channel_resource_id": {
+          "name": "channel_resource_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel_token": {
+          "name": "channel_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "channel_expires_at": {
           "name": "channel_expires_at",
           "type": "timestamp with time zone",
@@ -271,7 +283,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "calendar_links_channel_id_unique": {
+          "name": "calendar_links_channel_id_unique",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "calendar_links_user_id_users_id_fk": {
           "name": "calendar_links_user_id_users_id_fk",

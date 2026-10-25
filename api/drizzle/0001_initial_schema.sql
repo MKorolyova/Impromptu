@@ -32,6 +32,8 @@ CREATE TABLE "calendar_links" (
 	"encrypted_refresh_token" text NOT NULL,
 	"sync_token" text,
 	"channel_id" text,
+	"channel_resource_id" text,
+	"channel_token" text,
 	"channel_expires_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -132,6 +134,7 @@ ALTER TABLE "statuses" ADD CONSTRAINT "statuses_activity_id_activities_id_fk" FO
 CREATE INDEX "activities_owner_id_index" ON "activities" USING btree ("owner_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "activities_standard_name_unique" ON "activities" USING btree ("name") WHERE "activities"."owner_id" IS NULL;--> statement-breakpoint
 CREATE INDEX "activity_triggers_activity_id_index" ON "activity_triggers" USING btree ("activity_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "calendar_links_channel_id_unique" ON "calendar_links" USING btree ("channel_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "conversations_pair_unique" ON "conversations" USING btree ("user_a_id","user_b_id");--> statement-breakpoint
 CREATE INDEX "conversations_user_b_id_index" ON "conversations" USING btree ("user_b_id");--> statement-breakpoint
 CREATE INDEX "friendships_friend_id_index" ON "friendships" USING btree ("friend_id");--> statement-breakpoint
