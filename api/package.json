@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file=.env node_modules/.bin/drizzle-kit migrate",
+    "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
     "db:seed": "node --env-file=.env src/db/seed.ts"
   },
   "dependencies": {
+    "crypto": "^1.0.1",
     "drizzle-orm": "^0.45.4",
     "drizzle-zod": "^0.8.3",
     "next": "16.4.3",

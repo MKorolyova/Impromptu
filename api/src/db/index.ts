@@ -3,7 +3,11 @@ import postgres from "postgres";
 import { env } from "../env.ts";
 import * as schema from "./schema.ts";
 
-const client = postgres(env.DATABASE_URL, { ssl: "require" });
+// Reused across Next.js dev hot reloads, so each reload doesn't open a new pool.
+// SSL comes from the URL (?sslmode=require for Tiger Cloud; none for the local Docker db).
+const globalForDb = globalThis as typeof globalThis & { pgClient?: postgres.Sql };
+const client = globalForDb.pgClient ?? postgres(env.DATABASE_URL, { ssl: "require", connect_timeout: 10 });
+if (process.env.NODE_ENV !== "production") globalForDb.pgClient = client;
 
 export const db = drizzle({ client, schema, casing: "snake_case" });
 
