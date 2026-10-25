@@ -32,6 +32,8 @@ export const SharingResource = pgEnum("sharing_resource", ["LOCATION", "NOTES"])
 export const ShareLevel = pgEnum("share_level", ["NONE", "PLACE", "CITY", "EXACT"]);
 export const CalendarProvider = pgEnum("calendar_provider", ["GOOGLE"]);
 export const NoteRequestStatus = pgEnum("note_request_status", ["PENDING", "ANSWERED", "DECLINED"]);
+// Which APNs server a device token belongs to: SANDBOX for builds run from Xcode, PRODUCTION otherwise.
+export const PushEnvironment = pgEnum("push_environment", ["SANDBOX", "PRODUCTION"]);
 
 export const users = pgTable("users", {
     id: uuid().primaryKey().defaultRandom(),
@@ -169,6 +171,26 @@ export const userLocations = pgTable("user_locations", {
     index().using("gist", t.geom),
     index().on(t.updatedAt),
   ],
+);
+
+// APNs device tokens, for push notifications. A device belongs to whoever signed in on it last.
+export const deviceTokens = pgTable("device_tokens", {
+    token: text().primaryKey(),
+    userId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+    environment: PushEnvironment().notNull(),
+    ...timestamps,
+  },
+  (t) => [index().on(t.userId)],
+);
+
+// Who has been told about which status by a nearby push alert, so each match is announced once.
+export const nearbyAlerts = pgTable("nearby_alerts", {
+    recipientId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
+    // The other person's status, which matched the recipient's activity nearby.
+    statusId: uuid().notNull().references(() => statuses.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.recipientId, t.statusId] }), index().on(t.statusId)],
 );
 
 // One user asking someone nearby for a note; answered with text, and optionally a place and a position.

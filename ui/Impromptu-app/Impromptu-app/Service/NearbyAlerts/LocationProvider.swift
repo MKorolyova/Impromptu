@@ -39,7 +39,7 @@ final class CoreLocationProvider: NSObject, LocationProviding, CLLocationManager
     override init() {
         super.init()
         manager.delegate = self
-        // Nearby is about a mile; a coarse fix is enough and saves battery.
+        // Nearby is 3 miles; a coarse fix is enough and saves battery.
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 

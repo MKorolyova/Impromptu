@@ -22,12 +22,14 @@ final class SessionViewModel {
     private let widgets: WidgetSyncing
     private let nearbyAlerts: NearbyAlerting
     private let noteMonitor: NoteRequestMonitoring
+    private let push: PushRegistering
 
     init(services: Services) {
         account = services.account
         widgets = services.widgets
         nearbyAlerts = services.nearbyAlerts
         noteMonitor = services.noteMonitor
+        push = services.push
     }
 
     var user: User? {
@@ -42,7 +44,7 @@ final class SessionViewModel {
         }
         state = .restoring
         do {
-            state = .signedIn(try await account.restoreUser(userId))
+            signIn(try await account.restoreUser(userId))
         } catch let error as APIError where error.code == .notFound {
             // The account was deleted; forget it.
             signOut()
@@ -53,13 +55,19 @@ final class SessionViewModel {
     }
 
     func logIn(email: String, password: String) async throws {
-        state = .signedIn(try await account.logIn(email: email, password: password))
+        signIn(try await account.logIn(email: email, password: password))
     }
 
     /// Sign-up creates the account partway through and keeps its sheet up until the last step,
     /// then hands over here to open the home screen.
     func completeRegistration(_ user: User) {
+        signIn(user)
+    }
+
+    /// Also asks for this device's push token, so the server can send nearby alerts to this user.
+    private func signIn(_ user: User) {
         state = .signedIn(user)
+        push.register()
     }
 
     /// After a profile edit, so every screen shows the new name.
@@ -72,7 +80,11 @@ final class SessionViewModel {
         // Capture the ID first: stopping location sharing on the server needs it after sign-out clears it.
         let userId = account.storedUserId
         let nearbyAlerts = nearbyAlerts
-        Task { await nearbyAlerts.disable(userId: userId) }
+        let push = push
+        Task {
+            await nearbyAlerts.disable(userId: userId)
+            if let userId { await push.unregister(userId: userId) }
+        }
         account.signOut()
         noteMonitor.reset()
         widgets.clear()

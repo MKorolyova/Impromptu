@@ -9,6 +9,7 @@ import SwiftUI
 
 @main
 struct Impromptu_appApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let services: Services
     @State private var session: SessionViewModel
     /// Toggled from the profile menu; nil follows the system.
@@ -35,6 +36,7 @@ struct Impromptu_appApp: App {
                 .environment(\.services, services)
                 .environment(session)
                 .preferredColorScheme(theme.colorScheme)
+                .onAppear { appDelegate.push = services.push }
         }
     }
 }

@@ -6,7 +6,7 @@
 import SwiftUI
 import UIKit
 
-/// "Nearby, doing the same": the opt-in switch and the people within about a mile who match your activity.
+/// "Nearby, doing the same": the opt-in switch and the people within 3 miles who match your activity.
 struct NearbySection: View {
     let viewModel: HomeViewModel
     /// Opens the full list, to pick people and ask for a note.
@@ -62,15 +62,15 @@ struct NearbySection: View {
 
     private var summary: String {
         guard viewModel.isNearbyEnabled else {
-            return "Get a notification, at most once a minute, when someone new within a mile is doing what you're doing."
+            return "Get a notification, like a message, when someone within 3 miles starts doing what you're doing."
         }
         guard let nearby = viewModel.nearby else { return "Looking for people nearby…" }
         guard let activity = nearby.activity else { return "Set a status to find people nearby doing the same." }
         let name = activity.name.prefix(1).lowercased() + activity.name.dropFirst()
         switch nearby.users.count {
-        case 0: return "No one within a mile is \(name) right now. We'll let you know."
-        case 1: return "1 person within a mile is also \(name)."
-        default: return "\(nearby.users.count) people within a mile are also \(name)."
+        case 0: return "No one within 3 miles is \(name) right now. We'll let you know."
+        case 1: return "1 person within 3 miles is also \(name)."
+        default: return "\(nearby.users.count) people within 3 miles are also \(name)."
         }
     }
 }

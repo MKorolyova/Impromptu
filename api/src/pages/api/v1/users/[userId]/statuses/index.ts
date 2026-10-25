@@ -1,4 +1,5 @@
 import { getActivityForUser } from "@/activities-service/activities-queries";
+import { announceNearbyMatchesLater } from "@/locations-service/nearby-alerts";
 import { createStatus, listStatusesForUser } from "@/statuses-service/statuses-queries";
 import { apiRoute, parseOrReject, sendError } from "@/utils/api-response";
 import { requireUser } from "@/utils/route-params";
@@ -13,7 +14,8 @@ export default apiRoute({
     res.status(200).json({ statuses: await listStatusesForUser(user.id, { active }) });
   },
 
-  // POST /api/v1/users/{userId}/statuses — sets an activity with an optional note.
+  // POST /api/v1/users/{userId}/statuses — sets an activity with an optional note. People within 3 miles
+  // doing the same activity, and the user, then get a push about each other.
   async POST(req, res) {
     const user = await requireUser(req, res);
     if (!user) return;
@@ -35,5 +37,6 @@ export default apiRoute({
       expiresAt,
     });
     res.status(201).json({ status });
+    announceNearbyMatchesLater(user.id);
   },
 });

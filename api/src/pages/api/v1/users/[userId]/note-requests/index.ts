@@ -1,3 +1,4 @@
+import { NEARBY_RADIUS_METERS } from "@/constants/nearby";
 import { findNearbyMatches } from "@/locations-service/nearby";
 import {
   createNoteRequests,
@@ -6,7 +7,6 @@ import {
 } from "@/note-requests-service/note-requests-queries";
 import { apiRoute, parseOrReject, sendError } from "@/utils/api-response";
 import { requireUser } from "@/utils/route-params";
-import { nearbyQuerySchema } from "@/validators/locations";
 import { createNoteRequestsSchema } from "@/validators/note-requests";
 
 // Requests older than this drop out of the inbox.
@@ -31,9 +31,7 @@ export default apiRoute({
     if (!user) return;
     const body = parseOrReject(res, createNoteRequestsSchema, req.body);
     if (!body) return;
-    const { radiusMeters } = nearbyQuerySchema.parse({});
-
-    const { activity, matches } = await findNearbyMatches(user.id, radiusMeters);
+    const { activity, matches } = await findNearbyMatches(user.id, NEARBY_RADIUS_METERS);
     if (!activity) return sendError(res, "FORBIDDEN", "Set a status before asking people nearby for a note");
     const nearbyIds = new Set(matches.map((match) => match.id));
     const recipientIds = [...new Set(body.recipientIds)];

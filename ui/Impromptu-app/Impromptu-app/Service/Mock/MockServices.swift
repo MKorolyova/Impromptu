@@ -279,6 +279,30 @@ final class MockNearbyAlerts: NearbyAlerting {
     func performBackgroundCheck() async {}
 }
 
+/// Records every request and answers each with an empty success; for services whose requests are the point.
+final class RecordingAPIClient: APIClient {
+    private(set) var sent: [Endpoint] = []
+
+    func send<Response: Decodable>(_ endpoint: Endpoint) async throws -> Response {
+        sent.append(endpoint)
+        throw APIError.http(statusCode: 500, code: nil, message: "RecordingAPIClient has no responses")
+    }
+
+    func send(_ endpoint: Endpoint) async throws {
+        sent.append(endpoint)
+    }
+}
+
+final class MockPushService: PushRegistering {
+    private(set) var registerCount = 0
+    private(set) var receivedTokens: [Data] = []
+    private(set) var unregisteredUserIds: [UUID] = []
+
+    func register() { registerCount += 1 }
+    func didReceiveDeviceToken(_ deviceToken: Data) async { receivedTokens.append(deviceToken) }
+    func unregister(userId: UUID) async { unregisteredUserIds.append(userId) }
+}
+
 final class MockNoteRequestService: NoteRequestServicing {
     var inbox = SampleData.noteInbox
     private(set) var requestedRecipients: [UUID] = []

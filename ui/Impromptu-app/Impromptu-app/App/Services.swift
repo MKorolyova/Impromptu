@@ -16,6 +16,8 @@ struct Services {
     let statuses: StatusServicing
     let people: PeopleServicing
     let nearbyAlerts: NearbyAlerting
+    /// Registers this device for the server's push notifications (nearby alerts).
+    let push: PushRegistering
     let noteRequests: NoteRequestServicing
     let noteMonitor: NoteRequestMonitoring
     /// Shared by nearby alerts and note replies, so there's one CLLocationManager.
@@ -44,6 +46,7 @@ struct Services {
                 location: location,
                 notifications: notifications
             ),
+            push: PushNotificationService(account: account, client: client),
             noteRequests: noteRequests,
             noteMonitor: NoteRequestMonitor(account: account, api: noteRequests, notifications: notifications),
             location: location,
@@ -63,6 +66,7 @@ struct Services {
             statuses: MockStatusService(),
             people: MockPeopleService(),
             nearbyAlerts: MockNearbyAlerts(),
+            push: MockPushService(),
             noteRequests: noteRequests,
             noteMonitor: MockNoteRequestMonitor(service: noteRequests),
             location: MockLocationProvider(),

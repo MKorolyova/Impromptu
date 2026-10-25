@@ -67,7 +67,7 @@ struct NearbyPeopleView: View {
         case .loaded:
             if viewModel.people.isEmpty {
                 ContentUnavailableView("No one nearby right now", systemImage: "location.circle",
-                                       description: Text(activityLine.map { "No one within a mile is \($0)." } ?? ""))
+                                       description: Text(activityLine.map { "No one within 3 miles is \($0)." } ?? ""))
             } else {
                 peopleList
             }

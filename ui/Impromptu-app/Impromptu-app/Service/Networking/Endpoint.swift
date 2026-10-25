@@ -39,6 +39,11 @@ struct Endpoint {
     static func delete(_ path: String) -> Endpoint {
         Endpoint(method: .delete, path: path)
     }
+
+    /// For deletes that identify what to remove in the body, to keep it out of the URL.
+    static func delete(_ path: String, body: some Encodable) throws -> Endpoint {
+        Endpoint(method: .delete, path: path, body: try JSONEncoder.api.encode(body))
+    }
 }
 
 // MARK: - Routes
@@ -65,6 +70,14 @@ extension Endpoint {
 
     static func deleteLocation(for userId: UUID) -> Endpoint {
         delete("\(userPath(userId))/location")
+    }
+
+    static func saveDeviceToken(_ request: SaveDeviceTokenRequest, for userId: UUID) throws -> Endpoint {
+        try post("\(userPath(userId))/device-tokens", body: request)
+    }
+
+    static func deleteDeviceToken(_ request: DeleteDeviceTokenRequest, for userId: UUID) throws -> Endpoint {
+        try delete("\(userPath(userId))/device-tokens", body: request)
     }
 
     static func noteRequests(for userId: UUID) -> Endpoint {

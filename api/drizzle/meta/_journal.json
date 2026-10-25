@@ -57,6 +57,13 @@
       "when": 1792931760346,
       "tag": "0007_user_activities",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792941156680,
+      "tag": "0008_push_notifications",
+      "breakpoints": true
     }
   ]
 }

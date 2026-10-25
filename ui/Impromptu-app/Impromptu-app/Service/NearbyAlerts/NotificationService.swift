@@ -14,7 +14,8 @@ protocol NotificationPosting: AnyObject {
     func post(id: String, title: String, body: String, route: AppRoute) async
 }
 
-/// Local notifications, shown as banners even while the app is open. Tapping one sends its route to `AppRouter`.
+/// Posts local notifications, and shows them and the server's push notifications (nearby alerts) as banners
+/// even while the app is open. Tapping one sends its route to `AppRouter`; pushes carry it as `route` too.
 final class LocalNotificationService: NSObject, NotificationPosting, UNUserNotificationCenterDelegate {
     private nonisolated static let routeKey = "route"
 

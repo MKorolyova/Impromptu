@@ -10,6 +10,8 @@ const DISTANCE_STEP_METERS = 100;
 export type NearbyMatch = UserProfile & { status: PublicStatus; distanceMeters: number };
 
 export type NearbyMatches = {
+  // The user's own current status, which the matches share an activity with.
+  status: PublicStatus | null;
   activity: PublicStatus["activity"] | null;
   matches: NearbyMatch[];
 };
@@ -21,7 +23,7 @@ const roundDistance = (meters: number) =>
 // No activity and no matches when the user has no active status.
 export async function findNearbyMatches(userId: string, radiusMeters: number): Promise<NearbyMatches> {
   const myStatus = (await getCurrentStatuses([userId])).get(userId);
-  if (!myStatus) return { activity: null, matches: [] };
+  if (!myStatus) return { status: null, activity: null, matches: [] };
 
   const nearby = await findNearbyUsers(userId, {
     radiusMeters,
@@ -38,5 +40,5 @@ export async function findNearbyMatches(userId: string, radiusMeters: number): P
     const status = statuses.get(user.userId);
     return profile && status ? [{ ...profile, status, distanceMeters: roundDistance(user.distanceMeters) }] : [];
   });
-  return { activity: myStatus.activity, matches };
+  return { status: myStatus, activity: myStatus.activity, matches };
 }

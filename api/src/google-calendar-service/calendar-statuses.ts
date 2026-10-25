@@ -7,6 +7,7 @@ import {
 } from "@/google-calendar-service/google-calendar-queries";
 import { GoogleApiError } from "@/google-calendar-service/google-request";
 import { forgetGoogleAccessToken, readGoogleCalendarEvents } from "@/google-calendar-service/read-google-calendar";
+import { announceNearbyMatchesLater } from "@/locations-service/nearby-alerts";
 import {
   createCalendarStatus,
   hasCalendarStatus,
@@ -122,6 +123,7 @@ async function startStatusForEvent(
     expiresAt: new Date(event.endAt),
   });
   schedule.handled.add(key);
+  if (status) announceNearbyMatchesLater(user.userId);
   return status !== null;
 }
 

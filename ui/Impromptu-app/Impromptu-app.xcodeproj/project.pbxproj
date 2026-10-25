@@ -7,18 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CC8A279D308E432E00486CC3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279A308E432E00486CC3 /* Config.xcconfig */; };
-		CC8A279E308E432E00486CC3 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279B308E432E00486CC3 /* Secrets.xcconfig */; };
-		CC8A279F308E432E00486CC3 /* Secrets.example.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */; };
-		CC8A27A0308E432E00486CC3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279A308E432E00486CC3 /* Config.xcconfig */; };
-		CC8A27A1308E432E00486CC3 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279B308E432E00486CC3 /* Secrets.xcconfig */; };
-		CC8A27A2308E432E00486CC3 /* Secrets.example.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */; };
-		CC8A27A3308E432E00486CC3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279A308E432E00486CC3 /* Config.xcconfig */; };
-		CC8A27A4308E432E00486CC3 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279B308E432E00486CC3 /* Secrets.xcconfig */; };
-		CC8A27A5308E432E00486CC3 /* Secrets.example.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */; };
-		CC8A27A6308E432E00486CC3 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279A308E432E00486CC3 /* Config.xcconfig */; };
-		CC8A27A7308E432E00486CC3 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279B308E432E00486CC3 /* Secrets.xcconfig */; };
-		CC8A27A8308E432E00486CC3 /* Secrets.example.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */; };
 		D7BD370C308D7D80002DB116 /* ImpromptuWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D7BD3700308D7D80002DB116 /* ImpromptuWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -61,10 +49,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		CC8A2799308E41BB00486CC3 /* File.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = File.txt; sourceTree = "<group>"; };
-		CC8A279A308E432E00486CC3 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		CC8A279B308E432E00486CC3 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
-		CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.example.xcconfig; sourceTree = "<group>"; };
 		D7BD3692308D7D70002DB116 /* Impromptu-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Impromptu-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D7BD36A1308D7D72002DB116 /* Impromptu-appTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Impromptu-appTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D7BD36AB308D7D72002DB116 /* Impromptu-appUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Impromptu-appUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -175,12 +159,8 @@
 			isa = PBXGroup;
 			children = (
 				D7BD3711308D7D80002DB116 /* Config.xcconfig */,
-				CC8A2799308E41BB00486CC3 /* File.txt */,
 				D7BD3712308D7D80002DB116 /* Secrets.example.xcconfig */,
 				D7BD3713308D7D80002DB116 /* App-Info.plist */,
-				CC8A279A308E432E00486CC3 /* Config.xcconfig */,
-				CC8A279B308E432E00486CC3 /* Secrets.xcconfig */,
-				CC8A279C308E432E00486CC3 /* Secrets.example.xcconfig */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -335,9 +315,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CC8A27A0308E432E00486CC3 /* Config.xcconfig in Resources */,
-				CC8A27A1308E432E00486CC3 /* Secrets.xcconfig in Resources */,
-				CC8A27A2308E432E00486CC3 /* Secrets.example.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,9 +322,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CC8A279D308E432E00486CC3 /* Config.xcconfig in Resources */,
-				CC8A279E308E432E00486CC3 /* Secrets.xcconfig in Resources */,
-				CC8A279F308E432E00486CC3 /* Secrets.example.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -355,9 +329,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CC8A27A6308E432E00486CC3 /* Config.xcconfig in Resources */,
-				CC8A27A7308E432E00486CC3 /* Secrets.xcconfig in Resources */,
-				CC8A27A8308E432E00486CC3 /* Secrets.example.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,9 +336,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CC8A27A3308E432E00486CC3 /* Config.xcconfig in Resources */,
-				CC8A27A4308E432E00486CC3 /* Secrets.xcconfig in Resources */,
-				CC8A27A5308E432E00486CC3 /* Secrets.example.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

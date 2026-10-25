@@ -57,7 +57,7 @@ final class HomeViewModel {
     /// The built-in list (`GET /activities`), for the full activities page.
     private(set) var standardActivities: [StandardActivity] = []
     private(set) var isUpdatingStatus = false
-    /// People within about a mile doing the same activity as you; nil until fetched or when alerts are off.
+    /// People within 3 miles doing the same activity as you; nil until fetched or when alerts are off.
     private(set) var nearby: NearbyResult?
     private(set) var isNearbyEnabled: Bool
     private(set) var isChangingNearby = false

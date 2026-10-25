@@ -24,6 +24,7 @@ struct HomeViewModelTests {
             statuses: statuses ?? MockStatusService(),
             people: people ?? MockPeopleService(),
             nearbyAlerts: nearbyAlerts ?? MockNearbyAlerts(enabled: false),
+            push: MockPushService(),
             noteRequests: MockNoteRequestService(),
             noteMonitor: MockNoteRequestMonitor(),
             location: MockLocationProvider(),
@@ -163,6 +164,24 @@ struct SessionViewModelTests {
         #expect(session.user == SampleData.user)
     }
 
+    @Test func signingInRegistersForPushAndSigningOutUnregisters() async throws {
+        let push = MockPushService()
+        let session = SessionViewModel(services: Services.mock(signedIn: false).replacing(push: push))
+        try await session.logIn(email: SampleData.user.email, password: MockAccountService.password)
+        #expect(push.registerCount == 1)
+
+        session.signOut()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(push.unregisteredUserIds == [SampleData.user.id])
+    }
+
+    @Test func restoringRegistersForPush() async {
+        let push = MockPushService()
+        let session = SessionViewModel(services: Services.mock(signedIn: true).replacing(push: push))
+        await session.restore()
+        #expect(push.registerCount == 1)
+    }
+
     @Test func logInWithWrongPasswordShowsServerMessage() async {
         let session = SessionViewModel(services: .mock(signedIn: false))
         let viewModel = LoginViewModel()
@@ -192,6 +211,7 @@ struct RegistrationViewModelTests {
             statuses: MockStatusService(),
             people: MockPeopleService(),
             nearbyAlerts: MockNearbyAlerts(enabled: false),
+            push: MockPushService(),
             noteRequests: MockNoteRequestService(),
             noteMonitor: MockNoteRequestMonitor(),
             location: MockLocationProvider(),
@@ -386,6 +406,7 @@ struct SettingsViewModelTests {
             statuses: MockStatusService(),
             people: MockPeopleService(),
             nearbyAlerts: MockNearbyAlerts(enabled: false),
+            push: MockPushService(),
             noteRequests: MockNoteRequestService(),
             noteMonitor: MockNoteRequestMonitor(),
             location: MockLocationProvider(),
@@ -590,6 +611,15 @@ struct APIContractTests {
         #expect(Endpoint.removeFriend(friendId, for: userId).method == .delete)
         #expect(Endpoint.connectGoogleCalendar(for: userId).path == "\(base)/google-calendar")
         #expect(try Endpoint.searchUsers(SearchUsersRequest(email: "a@b.co")).path == "users/search")
+
+        let saveToken = try Endpoint.saveDeviceToken(SaveDeviceTokenRequest(token: "ab", environment: .production), for: userId)
+        #expect(saveToken.method == .post && saveToken.path == "\(base)/device-tokens")
+        #expect(try JSONDecoder().decode([String: String].self, from: try #require(saveToken.body))
+                == ["token": "ab", "environment": "PRODUCTION"])
+        let removeToken = try Endpoint.deleteDeviceToken(DeleteDeviceTokenRequest(token: "ab"), for: userId)
+        // The token goes in the body, not the URL.
+        #expect(removeToken.method == .delete && removeToken.path == "\(base)/device-tokens")
+        #expect(try JSONDecoder().decode([String: String].self, from: try #require(removeToken.body)) == ["token": "ab"])
     }
 
     @Test func routesMatchSpec() {
@@ -606,84 +636,6 @@ struct APIContractTests {
     }
 }
 
-struct NearbyAlertPolicyTests {
-    private let coding = UUID()
-    private let sam = UUID(), jo = UUID(), priya = UUID()
-    private let start = Date(timeIntervalSince1970: 1_800_000_000)
-
-    @Test func firstMatchNotifies() {
-        let (decision, state) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
-        #expect(decision == .notify(newUserIds: [sam]))
-        #expect(state.announcedUserIds == [sam])
-        #expect(state.lastNotifiedAt == start)
-    }
-
-    @Test func sameUsersAnHourLaterSendNothing() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam, jo], now: start)
-        let (decision, _) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [jo, sam],
-                                                       now: start.addingTimeInterval(2 * 3600))
-        #expect(decision == .skip(.nothingNew))
-    }
-
-    @Test func newUserWithinTheMinuteWaitsThenNotifies() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
-
-        let (early, waiting) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [sam, jo],
-                                                          now: start.addingTimeInterval(30))
-        #expect(early == .skip(.tooSoon))
-        #expect(!waiting.announcedUserIds.contains(jo))
-
-        let (later, _) = NearbyAlertPolicy.evaluate(state: waiting, activityId: coding, matchingUserIds: [sam, jo],
-                                                    now: start.addingTimeInterval(61))
-        #expect(later == .notify(newUserIds: [jo]))
-    }
-
-    @Test func changingActivityStartsOverButKeepsTimeLimit() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
-        let studying = UUID()
-
-        let (soon, rebased) = NearbyAlertPolicy.evaluate(state: first, activityId: studying, matchingUserIds: [sam],
-                                                         now: start.addingTimeInterval(30))
-        #expect(soon == .skip(.tooSoon))
-        #expect(rebased.activityId == studying)
-        #expect(rebased.announcedUserIds.isEmpty)
-
-        let (later, _) = NearbyAlertPolicy.evaluate(state: rebased, activityId: studying, matchingUserIds: [sam],
-                                                    now: start.addingTimeInterval(2 * 3600))
-        #expect(later == .notify(newUserIds: [sam]))
-    }
-
-    @Test func noStatusNeverNotifies() {
-        let (decision, _) = NearbyAlertPolicy.evaluate(state: .init(), activityId: nil, matchingUserIds: [sam], now: start)
-        #expect(decision == .skip(.noStatus))
-    }
-
-    @Test func peopleSeenInTheAppAreNotAnnounced() {
-        let seen = NearbyAlertPolicy.markSeen(state: .init(), activityId: coding, userIds: [sam, jo])
-        let (decision, _) = NearbyAlertPolicy.evaluate(state: seen, activityId: coding, matchingUserIds: [sam, jo, priya], now: start)
-        #expect(decision == .notify(newUserIds: [priya]))
-    }
-}
-
-@MainActor
-struct NearbyAlertMessageTests {
-    private func person(_ name: String) -> Person {
-        Person(id: UUID(), firstName: name, lastName: "X", nickname: nil, status: nil)
-    }
-
-    @Test func onePerson() {
-        let message = NearbyAlertMessage(newPeople: [person("Sam")], totalCount: 1, activityName: "Grabbing coffee")
-        #expect(message.title == "Sam is nearby")
-        #expect(message.body == "Sam is also grabbing coffee within a mile.")
-    }
-
-    @Test func severalPeopleWithOthersAlreadyAnnounced() {
-        let message = NearbyAlertMessage(newPeople: ["Sam", "Jo", "Priya"].map(person), totalCount: 5, activityName: "Coding")
-        #expect(message.title == "3 new people nearby")
-        #expect(message.body == "Sam, Jo and 1 more are also coding within a mile. 5 people nearby in all.")
-    }
-}
-
 @MainActor
 struct NearbyAlertsServiceTests {
     private let api = MockNearbyService()
@@ -691,9 +643,9 @@ struct NearbyAlertsServiceTests {
     private let notifications = MockNotificationService()
     private let defaults = UserDefaults(suiteName: "NearbyAlertsServiceTests-\(UUID().uuidString)")!
 
-    private func makeService(now: @escaping () -> Date = { .now }) -> NearbyAlertsService {
+    private func makeService() -> NearbyAlertsService {
         NearbyAlertsService(account: MockAccountService(), api: api, location: location,
-                            notifications: notifications, defaults: defaults, now: now)
+                            notifications: notifications, defaults: defaults)
     }
 
     @Test func enablingStartsMonitoring() async {
@@ -712,29 +664,47 @@ struct NearbyAlertsServiceTests {
         #expect(!service.isEnabled)
     }
 
-    @Test func backgroundCheckSharesLocationAndNotifiesOnlyOnceForSamePeople() async {
-        var clock = Date(timeIntervalSince1970: 1_800_000_000)
-        let service = makeService(now: { clock })
+    @Test func enablingAsksToShowNotifications() async {
+        notifications.authorized = false
+        let service = makeService()
+        let outcome = await service.enable()
+        // Location is what turns alerts on; without notifications they just can't be shown.
+        #expect(outcome.isEnabled)
+        #expect(!outcome.notificationsAllowed)
+    }
+
+    @Test func backgroundCheckSharesLocationAndLeavesNotifyingToServer() async {
+        let service = makeService()
         _ = await service.enable()
 
         await service.performBackgroundCheck()
         #expect(api.sharedLocations.count == 1)
-        #expect(notifications.posted.count == 1)
-
-        clock.addTimeInterval(2 * 3600)
-        await service.performBackgroundCheck()
-        #expect(notifications.posted.count == 1)
+        #expect(notifications.posted.isEmpty)
     }
 
-    @Test func peopleSeenInForegroundDontTriggerNotification() async throws {
+    @Test func significantLocationChangeIsReported() async throws {
+        let service = makeService()
+        _ = await service.enable()
+
+        location.onUpdate?(Coordinate(latitude: 30.29, longitude: -97.74))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(api.sharedLocations.last == Coordinate(latitude: 30.29, longitude: -97.74))
+    }
+
+    @Test func foregroundRefreshSharesLocationAndReturnsMatchesWithinThreeMiles() async throws {
         let service = makeService()
         _ = await service.enable()
 
         let result = try await service.refreshInForeground()
         #expect(result.users.count == 3)
+        #expect(api.sharedLocations.count == 1)
+        #expect(NearbyAlertsService.radiusMeters == 4828)
+    }
 
+    @Test func nothingIsSharedWhileOff() async {
+        let service = makeService()
         await service.performBackgroundCheck()
-        #expect(notifications.posted.isEmpty)
+        #expect(api.sharedLocations.isEmpty)
     }
 
     @Test func disablingStopsSharingOnServer() async {
@@ -745,6 +715,46 @@ struct NearbyAlertsServiceTests {
         #expect(!service.isEnabled)
         #expect(!location.isMonitoring)
         #expect(api.stopSharingCount == 1)
+    }
+}
+
+@MainActor
+struct PushNotificationServiceTests {
+    private let client = RecordingAPIClient()
+
+    @Test func tokenIsRegisteredAsHexForTheSignedInUser() async throws {
+        var requests = 0
+        let service = PushNotificationService(account: MockAccountService(), client: client, requestToken: { requests += 1 })
+        service.register()
+        #expect(requests == 1)
+
+        await service.didReceiveDeviceToken(Data([0x0a, 0xff, 0x01]))
+        let sent = try #require(client.sent.first)
+        #expect(sent.method == .post)
+        #expect(sent.path == "users/\(SampleData.user.id.pathComponent)/device-tokens")
+        // Tests build in Debug, which gets sandbox tokens.
+        #expect(try JSONDecoder().decode([String: String].self, from: try #require(sent.body))
+                == ["token": "0aff01", "environment": "SANDBOX"])
+    }
+
+    @Test func tokenArrivingWhileSignedOutIsKeptButNotSent() async {
+        let service = PushNotificationService(account: MockAccountService(signedIn: false), client: client, requestToken: {})
+        await service.didReceiveDeviceToken(Data([0x01]))
+        #expect(service.deviceToken == "01")
+        #expect(client.sent.isEmpty)
+    }
+
+    @Test func unregisteringRemovesThisDevicesToken() async throws {
+        let service = PushNotificationService(account: MockAccountService(), client: client, requestToken: {})
+        await service.unregister(userId: SampleData.user.id)
+        // Nothing to remove before iOS has handed over a token.
+        #expect(client.sent.isEmpty)
+
+        await service.didReceiveDeviceToken(Data([0xab, 0xcd]))
+        await service.unregister(userId: SampleData.user.id)
+        let removal = try #require(client.sent.last)
+        #expect(removal.method == .delete)
+        #expect(try JSONDecoder().decode([String: String].self, from: try #require(removal.body)) == ["token": "abcd"])
     }
 }
 
@@ -773,7 +783,8 @@ struct NearbyContractTests {
         let update = try Endpoint.updateLocation(UpdateLocationRequest(latitude: 30.28, longitude: -97.73, accuracyMeters: nil), for: userId)
         #expect(update.method == .put)
         #expect(update.path == "users/7f1b7c4e-8a0e-4c55-9d0e-0b6c2a1d9f11/location")
-        #expect(Endpoint.nearby(for: userId, radiusMeters: 1600).queryItems == [URLQueryItem(name: "radiusMeters", value: "1600")])
+        #expect(Endpoint.nearby(for: userId, radiusMeters: NearbyAlertsService.radiusMeters).queryItems
+                == [URLQueryItem(name: "radiusMeters", value: "4828")])
         #expect(Endpoint.people.path == "feed")
     }
 }
@@ -1000,6 +1011,7 @@ extension Services {
     /// A copy with some services swapped, so tests don't break each time `Services` gains a field.
     func replacing(
         nearbyAlerts: NearbyAlerting? = nil,
+        push: PushRegistering? = nil,
         noteRequests: NoteRequestServicing? = nil,
         noteMonitor: NoteRequestMonitoring? = nil,
         location: LocationProviding? = nil
@@ -1008,6 +1020,7 @@ extension Services {
             account: account, activities: activities, friends: friends, calendar: calendar,
             statusPreferences: statusPreferences, statuses: statuses, people: people,
             nearbyAlerts: nearbyAlerts ?? self.nearbyAlerts,
+            push: push ?? self.push,
             noteRequests: noteRequests ?? self.noteRequests,
             noteMonitor: noteMonitor ?? self.noteMonitor,
             location: location ?? self.location,
@@ -1090,7 +1103,7 @@ extension Services {
         Services(
             account: account, activities: activities, friends: friends, calendar: calendar,
             statusPreferences: statusPreferences, statuses: statuses, people: people,
-            nearbyAlerts: nearbyAlerts, noteRequests: noteRequests, noteMonitor: noteMonitor,
+            nearbyAlerts: nearbyAlerts, push: push, noteRequests: noteRequests, noteMonitor: noteMonitor,
             location: location, router: router, widgets: widgets
         )
     }

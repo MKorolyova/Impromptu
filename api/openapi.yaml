@@ -16,6 +16,16 @@ info:
     changed end time moves `expiresAt`. All-day events, events marked Free, out-of-office and
     working-location events never become statuses. Fetch `GET /users/{userId}/statuses?active=true`
     to show them.
+
+    ## Nearby push alerts
+    "Nearby" means within 3 miles (4828 m) everywhere: `GET /users/{userId}/nearby` by default, who
+    can be asked for a note, and push alerts. When someone sets a status (by hand or from their
+    calendar) or reports a position, the server finds everyone nearby whose current status has the same
+    activity and sends Apple push notifications both ways: each of them gets "<name> is nearby", and the
+    user gets one notification naming all of them. Each person hears about each status once. Only
+    devices registered with `POST /users/{userId}/device-tokens` get them, and only when the server has
+    `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` and `APNS_BUNDLE_ID` set. The push payload has
+    `route: "nearbyPeople"` next to `aps`, naming the screen a tap should open.
 servers:
   - url: http://localhost:3000/api/v1
 security:
@@ -473,6 +483,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       summary: Set a status (an activity with an optional note)
+      description: Afterwards, people nearby doing the same activity and the user get push alerts about each other.
       operationId: createStatus
       requestBody:
         required: true
@@ -524,7 +535,8 @@ paths:
       summary: Report the user's current position
       description: |
         Used only to find people nearby; never returned to anyone. Positions older than 2 hours are
-        ignored, so people who stop reporting drop out of `nearby` on their own.
+        ignored, so people who stop reporting drop out of `nearby` on their own. Afterwards, anyone now
+        nearby doing the same activity and the user get push alerts about each other.
       operationId: updateLocation
       requestBody:
         required: true
@@ -558,7 +570,7 @@ paths:
       parameters:
         - name: radiusMeters
           in: query
-          schema: { type: integer, minimum: 50, maximum: 50000, default: 1600 }
+          schema: { type: integer, minimum: 50, maximum: 50000, default: 4828 }
       responses:
         "200":
           description: OK
@@ -577,6 +589,52 @@ paths:
                   users:
                     type: array
                     items: { $ref: "#/components/schemas/UserWithStatus" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/device-tokens:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    post:
+      summary: Register this device for push notifications
+      description: |
+        Send the APNs device token after every launch while signed in; sending the same token again is
+        fine. A token registered by another user moves to this one, since a device has one signed-in user.
+        `environment` is `SANDBOX` for builds run from Xcode and `PRODUCTION` otherwise; if it's wrong,
+        the server finds out from APNs and corrects it.
+      operationId: saveDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, environment]
+              properties:
+                token: { $ref: "#/components/schemas/DeviceToken" }
+                environment: { type: string, enum: [SANDBOX, PRODUCTION] }
+      responses:
+        "204": { description: Registered }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Stop push notifications to this device
+      description: |
+        For signing out. The token is in the body rather than the URL so it stays out of logs. Succeeds
+        even when the token wasn't registered to the user.
+      operationId: deleteDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { $ref: "#/components/schemas/DeviceToken" }
+      responses:
+        "204": { description: Removed }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -848,6 +906,10 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    DeviceToken:
+      type: string
+      pattern: "^[0-9a-fA-F]{64,200}$"
+      description: The APNs device token, hex-encoded. Stored lowercase.
     UpdateLocationRequest:
       type: object
       required: [latitude, longitude]
