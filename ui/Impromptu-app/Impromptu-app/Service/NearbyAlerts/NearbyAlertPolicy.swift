@@ -29,11 +29,11 @@ nonisolated enum NearbyAlertDecision: Equatable, Sendable {
 }
 
 /// The rules for nearby notifications:
-/// - at most one per `minimumInterval` (an hour);
+/// - at most one per `minimumInterval` (a minute);
 /// - only when someone new matches; if everyone was already announced, nothing is sent;
 /// - changing your activity starts over, since the matches are for a different activity.
 nonisolated enum NearbyAlertPolicy {
-    static let minimumInterval: TimeInterval = 60 * 60
+    static let minimumInterval: TimeInterval = 60
 
     static func evaluate(
         state: NearbyAlertState,
@@ -66,7 +66,7 @@ nonisolated enum NearbyAlertPolicy {
 
     private static func rebased(_ state: NearbyAlertState, on activityId: UUID?) -> NearbyAlertState {
         guard state.activityId != activityId else { return state }
-        // Keep lastNotifiedAt: the hourly limit applies across activities.
+        // Keep lastNotifiedAt: the time limit applies across activities.
         return NearbyAlertState(activityId: activityId, announcedUserIds: [], lastNotifiedAt: state.lastNotifiedAt)
     }
 }

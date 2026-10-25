@@ -5,22 +5,28 @@
 
 import SwiftUI
 
-/// Every activity, searchable, with custom ones you can add or delete.
-/// Picking one fills the status drop-down; nothing is posted until you tap Update.
+/// Your activities (the list picked at sign-up, which the drop-down uses) and, separately, every other
+/// activity, which you can add to your list. Picking one of yours fills the status drop-down; nothing is
+/// posted until you tap Update.
 struct ActivityPickerView: View {
-    let activities: [Activity]
-    let selected: Activity?
-    let onSelect: (Activity) -> Void
-    /// Creates a custom activity; returns nil on failure.
-    let onCreate: (String, Int) async -> Activity?
-    let onDelete: (Activity) -> Void
+    @Bindable var viewModel: HomeViewModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var isAddingActivity = false
+    /// The one being added after a tap.
+    @State private var addingID: ActivityChoice.ID?
 
-    private var filtered: [Activity] {
-        query.isEmpty ? activities : activities.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    private func matches(_ name: String) -> Bool {
+        query.isEmpty || name.localizedCaseInsensitiveContains(query)
+    }
+
+    private var myList: [Activity] {
+        viewModel.myList.filter { matches($0.name) }
+    }
+
+    private var addable: [ActivityChoice] {
+        viewModel.addableChoices.filter { matches($0.name) }
     }
 
     var body: some View {
@@ -29,60 +35,127 @@ struct ActivityPickerView: View {
                 Section {
                     Button("New Custom Activity", systemImage: "plus") { isAddingActivity = true }
                 }
+
                 Section {
-                    ForEach(filtered) { activity in
+                    if viewModel.myList.isEmpty {
+                        Text("Add activities from the list below.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(myList) { activity in
                         Button {
-                            onSelect(activity)
+                            viewModel.draft.activity = activity
                             dismiss()
                         } label: {
-                            HStack(spacing: 12) {
-                                ActivityIcon(activityName: activity.name, size: 30)
-                                VStack(alignment: .leading) {
-                                    Text(activity.name)
-                                    Text(Duration.seconds(activity.defaultDuration), format: .units(allowed: [.hours, .minutes], width: .abbreviated))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if activity.isCustom {
-                                    Text("Custom")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                                if activity == selected {
+                            ActivityRow(name: activity.name, minutes: activity.defaultDurationMinutes, isCustom: activity.isCustom) {
+                                if activity == viewModel.draft.activity {
                                     Image(systemName: "checkmark")
                                         .foregroundStyle(.tint)
                                 }
                             }
                         }
                         .tint(.primary)
-                        .deleteDisabled(!activity.isCustom)
+                        .swipeActions(edge: .trailing) {
+                            if activity.isCustom {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    Task { await viewModel.deleteActivity(activity) }
+                                }
+                            }
+                            if viewModel.canRemoveFromMyList(activity) {
+                                Button("Remove", systemImage: "minus.circle") {
+                                    Task { await viewModel.removeFromMyList(activity) }
+                                }
+                                .tint(.orange)
+                            }
+                        }
                     }
-                    .onDelete { offsets in
-                        offsets.map { filtered[$0] }.forEach(onDelete)
-                    }
+                } header: {
+                    Text("Your activities")
                 } footer: {
-                    Text("Swipe a custom activity to delete it.")
+                    Text("Tap one to use it for your status. Swipe to remove it from your list.")
+                }
+
+                Section {
+                    ForEach(addable) { choice in
+                        Button {
+                            add(choice)
+                        } label: {
+                            ActivityRow(name: choice.name, minutes: choice.defaultDurationMinutes, isCustom: choice.isCustom) {
+                                if addingID == choice.id {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                        .tint(.primary)
+                        .disabled(addingID != nil)
+                        .accessibilityHint("Adds it to your activities")
+                    }
+                    if addable.isEmpty {
+                        Text(query.isEmpty ? "Everything is already in your list." : "No other activities match.")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("All activities")
+                } footer: {
+                    Text("Tap to add to your activities.")
                 }
             }
+            .animation(.snappy, value: viewModel.myList)
             .searchable(text: $query, prompt: "Search activities")
             .navigationTitle("Activities")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
             .sheet(isPresented: $isAddingActivity) {
                 NewActivityView(initialName: query) { name, minutes in
-                    if let activity = await onCreate(name, minutes) {
-                        onSelect(activity)
-                    }
+                    await viewModel.createAndAddActivity(name: name, durationMinutes: minutes)
                     // Close either way; on failure the home screen's alert explains why.
                     dismiss()
                 }
             }
         }
+    }
+
+    private func add(_ choice: ActivityChoice) {
+        addingID = choice.id
+        Task {
+            await viewModel.addToMyList(choice)
+            addingID = nil
+        }
+    }
+}
+
+/// Icon, name and default length, with a trailing accessory.
+private struct ActivityRow<Accessory: View>: View {
+    let name: String
+    let minutes: Int
+    let isCustom: Bool
+    @ViewBuilder let accessory: Accessory
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ActivityIcon(activityName: name, size: 30)
+            VStack(alignment: .leading) {
+                Text(name)
+                Text(Duration.seconds(minutes * 60), format: .units(allowed: [.hours, .minutes], width: .abbreviated))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isCustom {
+                Text("Custom")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            accessory
+        }
+        .contentShape(Rectangle())
     }
 }
 
@@ -136,6 +209,7 @@ private struct NewActivityView: View {
 }
 
 #Preview {
-    ActivityPickerView(activities: SampleData.activities, selected: SampleData.activities[1],
-                       onSelect: { _ in }, onCreate: { _, _ in nil }, onDelete: { _ in })
+    @Previewable @State var viewModel = HomeViewModel(user: SampleData.user, services: .mock())
+    ActivityPickerView(viewModel: viewModel)
+        .task { await viewModel.load() }
 }

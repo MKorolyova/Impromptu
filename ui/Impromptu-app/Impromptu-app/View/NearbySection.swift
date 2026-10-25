@@ -62,7 +62,7 @@ struct NearbySection: View {
 
     private var summary: String {
         guard viewModel.isNearbyEnabled else {
-            return "Get a notification, at most once an hour, when someone new within a mile is doing what you're doing."
+            return "Get a notification, at most once a minute, when someone new within a mile is doing what you're doing."
         }
         guard let nearby = viewModel.nearby else { return "Looking for people nearby…" }
         guard let activity = nearby.activity else { return "Set a status to find people nearby doing the same." }

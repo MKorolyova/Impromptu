@@ -11,7 +11,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Impromptu uses your location to find people within a mile doing the same thing as you. Your exact location is never shown to anyone.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Allow Always so Impromptu can let you know, at most once an hour, when someone new nearby is doing the same thing, even while the app is closed. Your exact location is never shown to anyone.</string>
+	<string>Allow Always so Impromptu can let you know, at most once a minute, when someone new nearby is doing the same thing, even while the app is closed. Your exact location is never shown to anyone.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

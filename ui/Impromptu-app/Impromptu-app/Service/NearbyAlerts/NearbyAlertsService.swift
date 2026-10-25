@@ -26,7 +26,7 @@ protocol NearbyAlerting: AnyObject {
     /// For the home screen: reports your position and returns current matches, counting them as seen,
     /// so they won't be announced again. Never notifies.
     func refreshInForeground() async throws -> NearbyResult
-    /// For the hourly background refresh: reports your position and notifies if the policy allows.
+    /// For the background refresh: reports your position and notifies if the policy allows.
     func performBackgroundCheck() async
 }
 
@@ -117,7 +117,7 @@ final class NearbyAlertsService: NearbyAlerting {
     }
 
     func performBackgroundCheck() async {
-        // Book the next run first, so a failed check doesn't end the hourly cycle.
+        // Book the next run first, so a failed check doesn't end the cycle.
         scheduleBackgroundCheck()
         await check(reporting: await location.currentLocation())
     }
@@ -149,6 +149,7 @@ final class NearbyAlertsService: NearbyAlerting {
         // Submitting without a registered handler raises an uncatchable exception.
         guard BackgroundRefresh.isRegistered else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskIdentifier)
+        // Only the earliest time: iOS decides when it actually runs, usually much later than a minute.
         request.earliestBeginDate = now().addingTimeInterval(NearbyAlertPolicy.minimumInterval)
         // Fails in the simulator and when Background App Refresh is off; significant changes still work.
         try? BGTaskScheduler.shared.submit(request)

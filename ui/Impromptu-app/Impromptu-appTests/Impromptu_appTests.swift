@@ -585,25 +585,25 @@ struct NearbyAlertPolicyTests {
         #expect(decision == .skip(.nothingNew))
     }
 
-    @Test func newUserWithinTheHourWaitsThenNotifies() {
+    @Test func newUserWithinTheMinuteWaitsThenNotifies() {
         let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
 
         let (early, waiting) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [sam, jo],
-                                                          now: start.addingTimeInterval(20 * 60))
+                                                          now: start.addingTimeInterval(30))
         #expect(early == .skip(.tooSoon))
         #expect(!waiting.announcedUserIds.contains(jo))
 
         let (later, _) = NearbyAlertPolicy.evaluate(state: waiting, activityId: coding, matchingUserIds: [sam, jo],
-                                                    now: start.addingTimeInterval(61 * 60))
+                                                    now: start.addingTimeInterval(61))
         #expect(later == .notify(newUserIds: [jo]))
     }
 
-    @Test func changingActivityStartsOverButKeepsHourlyLimit() {
+    @Test func changingActivityStartsOverButKeepsTimeLimit() {
         let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
         let studying = UUID()
 
         let (soon, rebased) = NearbyAlertPolicy.evaluate(state: first, activityId: studying, matchingUserIds: [sam],
-                                                         now: start.addingTimeInterval(10 * 60))
+                                                         now: start.addingTimeInterval(30))
         #expect(soon == .skip(.tooSoon))
         #expect(rebased.activityId == studying)
         #expect(rebased.announcedUserIds.isEmpty)
@@ -972,6 +972,86 @@ extension Services {
             noteMonitor: noteMonitor ?? self.noteMonitor,
             location: location ?? self.location,
             router: router, widgets: widgets
+        )
+    }
+}
+
+@MainActor
+struct ActivitiesPageTests {
+    private let activities = MockActivityService()
+
+    private func makeViewModel() async -> HomeViewModel {
+        let viewModel = HomeViewModel(user: SampleData.user, services: Services.mock().replacingActivities(activities))
+        await viewModel.load()
+        return viewModel
+    }
+
+    @Test func yourListAndTheRestAreSeparate() async {
+        activities.standardActivities.append(StandardActivity(name: "Stargazing", defaultDurationMinutes: 60))
+        let viewModel = await makeViewModel()
+
+        // The mock saves the first five at sign-up.
+        #expect(viewModel.myList.map(\.name) == SampleData.activities.prefix(5).map(\.name))
+        let addable = viewModel.addableChoices.map(\.name)
+        #expect(addable == SampleData.activities.dropFirst(5).map(\.name) + ["Stargazing"])
+        #expect(Set(addable).isDisjoint(with: viewModel.myList.map(\.name)))
+    }
+
+    @Test func addingAStandardActivityMovesItIntoYourList() async throws {
+        activities.standardActivities.append(StandardActivity(name: "Stargazing", defaultDurationMinutes: 60))
+        let viewModel = await makeViewModel()
+        let stargazing = try #require(viewModel.addableChoices.first { $0.name == "Stargazing" })
+
+        #expect(await viewModel.addToMyList(stargazing))
+        #expect(activities.savedStandardNames.contains("Stargazing"))
+        #expect(viewModel.myList.contains { $0.name == "Stargazing" && !$0.isCustom })
+        #expect(!viewModel.addableChoices.contains { $0.name == "Stargazing" })
+        // Its new row is usable for a status.
+        #expect(viewModel.activities.contains { $0.name == "Stargazing" })
+    }
+
+    @Test func addingYourOwnCustomActivity() async throws {
+        let mine = Activity(id: UUID(), ownerId: SampleData.user.id, name: "Robotics club", iconId: nil, defaultDurationMinutes: 90, isCustom: true)
+        activities.activities.insert(mine, at: 0)
+        let viewModel = await makeViewModel()
+        let choice = try #require(viewModel.addableChoices.first)
+        #expect(choice.customId == mine.id)
+
+        #expect(await viewModel.addToMyList(choice))
+        #expect(viewModel.myList.contains(mine))
+        #expect(activities.savedIds.contains(mine.id))
+    }
+
+    @Test func removingTakesItOutButKeepsDefaultsAndAtLeastOne() async throws {
+        let viewModel = await makeViewModel()
+        let first = try #require(viewModel.myList.first)
+        viewModel.draft.activity = first
+
+        await viewModel.removeFromMyList(first)
+        #expect(!viewModel.myList.contains(first))
+        #expect(viewModel.addableChoices.contains { $0.name == first.name })
+        #expect(viewModel.draft.activity == nil)
+
+        let free = Activity(id: UUID(), ownerId: SampleData.user.id, name: "Free", iconId: nil, defaultDurationMinutes: 60, isCustom: true)
+        #expect(!viewModel.canRemoveFromMyList(free))
+    }
+
+    @Test func newCustomActivityIsAddedAndDrafted() async {
+        let viewModel = await makeViewModel()
+        await viewModel.createAndAddActivity(name: "Hackathon judging", durationMinutes: 45)
+
+        #expect(viewModel.myList.contains { $0.name == "Hackathon judging" && $0.isCustom })
+        #expect(viewModel.draft.activity?.name == "Hackathon judging")
+    }
+}
+
+extension Services {
+    func replacingActivities(_ activities: ActivityServicing) -> Services {
+        Services(
+            account: account, activities: activities, friends: friends, calendar: calendar,
+            statusPreferences: statusPreferences, statuses: statuses, people: people,
+            nearbyAlerts: nearbyAlerts, noteRequests: noteRequests, noteMonitor: noteMonitor,
+            location: location, router: router, widgets: widgets
         )
     }
 }

@@ -6,7 +6,7 @@
 import BackgroundTasks
 import Foundation
 
-/// The hourly background refresh (nearby check and note polling).
+/// The background refresh (nearby check and note polling). iOS decides how often it runs.
 ///
 /// Registered with BGTaskScheduler directly rather than SwiftUI's `.backgroundTask` modifier:
 /// SwiftUI registers late, when the scene is built, and submitting a request before a handler

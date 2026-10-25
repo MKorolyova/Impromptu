@@ -73,6 +73,18 @@ final class MockActivityService: ActivityServicing {
         activities
     }
 
+    /// Like the server: a standard activity's row is reused, or made the first time it's saved.
+    private func standardRow(named name: String) throws -> Activity {
+        if let row = activities.first(where: { !$0.isCustom && $0.name == name }) { return row }
+        guard let standard = standardActivities.first(where: { $0.name == name }) else {
+            throw APIError.http(statusCode: 404, code: .notFound, message: "Not a standard activity")
+        }
+        let row = Activity(id: UUID(), ownerId: nil, name: name, iconId: nil,
+                           defaultDurationMinutes: standard.defaultDurationMinutes, isCustom: false)
+        activities.append(row)
+        return row
+    }
+
     func createActivity(name: String, durationMinutes: Int, for userId: UUID) async throws -> Activity {
         let activity = Activity(id: UUID(), ownerId: userId, name: name, iconId: nil,
                                 defaultDurationMinutes: durationMinutes, isCustom: true)
@@ -90,8 +102,7 @@ final class MockActivityService: ActivityServicing {
 
     func saveActivities(customIds: [UUID], standardNames: [String], for userId: UUID) async throws -> [Activity] {
         savedStandardNames = standardNames
-        // Like the server: a standard name resolves to its row, which exists after first use.
-        let standardIds = standardNames.compactMap { name in activities.first { !$0.isCustom && $0.name == name }?.id }
+        let standardIds = try standardNames.map { try standardRow(named: $0).id }
         savedIds = customIds + standardIds
         return try await fetchSavedActivities(for: userId)
     }

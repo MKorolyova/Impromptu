@@ -21,7 +21,7 @@ struct StatusDraft: Equatable {
 
 enum NearbyNotice: Equatable {
     case locationDenied
-    /// Works while the app is open, but no background checks or hourly alerts.
+    /// Works while the app is open, but no background checks or alerts while it's closed.
     case whileUsingOnly
     case notificationsDenied
 
@@ -54,6 +54,8 @@ final class HomeViewModel {
     private(set) var activities: [Activity] = []
     /// The ones picked at sign-up; the composer's drop-down lists these.
     private(set) var savedActivities: [Activity] = []
+    /// The built-in list (`GET /activities`), for the full activities page.
+    private(set) var standardActivities: [StandardActivity] = []
     private(set) var isUpdatingStatus = false
     /// People within about a mile doing the same activity as you; nil until fetched or when alerts are off.
     private(set) var nearby: NearbyResult?
@@ -99,6 +101,16 @@ final class HomeViewModel {
         return choices
     }
 
+    /// Everything there is, like the sign-up form: your own on top, then every standard one.
+    var activityChoices: [ActivityChoice] {
+        let custom = activities.filter(\.isCustom).map { ActivityChoice(custom: $0) }
+        // If the built-in list couldn't load, fall back to the standard rows the database has.
+        let standard = standardActivities.isEmpty
+            ? activities.filter { !$0.isCustom }.map { ActivityChoice(standard: StandardActivity(name: $0.name, defaultDurationMinutes: $0.defaultDurationMinutes)) }
+            : standardActivities.map { ActivityChoice(standard: $0) }
+        return custom + standard
+    }
+
     var canPublishDraft: Bool {
         draft.activity != nil && !isUpdatingStatus && draft.note.count <= StatusDraft.maxNoteLength
     }
@@ -113,12 +125,15 @@ final class HomeViewModel {
             async let people = services.people.fetchPeople()
             async let activities = services.activities.fetchActivities(for: user.id)
             async let saved = services.activities.fetchSavedActivities(for: user.id)
+            // The built-in list doesn't change while the app runs, so fetch it once.
+            async let standard = standardActivities.isEmpty ? services.activities.fetchStandardActivities() : standardActivities
             let (loadedStatus, loadedPeople, loadedActivities) = try await (status, people, activities)
             myStatus = loadedStatus
             self.people = loadedPeople.filter { $0.id != user.id }
             self.activities = loadedActivities
             // The drop-down falls back to every activity, so the feed still loads without these.
             savedActivities = (try? await saved) ?? savedActivities
+            standardActivities = (try? await standard) ?? standardActivities
             // Later refreshes leave whatever is being typed alone.
             if isFirstLoad { resetDraft() }
             loadState = .loaded
@@ -220,6 +235,73 @@ final class HomeViewModel {
     func refreshNotes() async {
         guard let inbox = try? await services.noteMonitor.poll(notify: true) else { return }
         openNoteRequestCount = inbox.openIncomingCount
+    }
+
+    // MARK: Activities page
+
+    /// "Your activities": the list picked at sign-up. The drop-down's chips come from it.
+    var myList: [Activity] {
+        savedActivities
+    }
+
+    /// "All activities": everything not in your list yet, your other custom ones first, then the built-in list.
+    var addableChoices: [ActivityChoice] {
+        let savedCustomIds = Set(savedActivities.filter(\.isCustom).map(\.id))
+        let savedStandardNames = Set(savedActivities.filter { !$0.isCustom }.map(\.name))
+        return activityChoices.filter { choice in
+            switch choice.source {
+            case .custom(let id): !savedCustomIds.contains(id)
+            case .standard: !savedStandardNames.contains(choice.name)
+            }
+        }
+    }
+
+    /// "Free" and "Do not disturb" always stay, and the list can't be emptied.
+    func canRemoveFromMyList(_ activity: Activity) -> Bool {
+        savedActivities.count > 1 && !RegistrationViewModel.isDefaultActivity(activity.name)
+    }
+
+    /// Adds to your list. A standard activity goes by name; the server finds or creates its row.
+    @discardableResult
+    func addToMyList(_ choice: ActivityChoice) async -> Bool {
+        var customIds = savedActivities.filter(\.isCustom).map(\.id)
+        var standardNames = savedActivities.filter { !$0.isCustom }.map(\.name)
+        switch choice.source {
+        case .custom(let id): customIds.append(id)
+        case .standard: standardNames.append(choice.name)
+        }
+        return await saveMyList(customIds: customIds, standardNames: standardNames)
+    }
+
+    func removeFromMyList(_ activity: Activity) async {
+        guard canRemoveFromMyList(activity) else { return }
+        let remaining = savedActivities.filter { $0.id != activity.id }
+        let removed = await saveMyList(customIds: remaining.filter(\.isCustom).map(\.id),
+                                       standardNames: remaining.filter { !$0.isCustom }.map(\.name))
+        if removed, draft.activity == activity { draft.activity = nil }
+    }
+
+    /// Creates a custom activity, adds it to your list and drafts it.
+    func createAndAddActivity(name: String, durationMinutes: Int) async {
+        guard let activity = await createActivity(name: name, durationMinutes: durationMinutes) else { return }
+        if await addToMyList(ActivityChoice(custom: activity)) {
+            draft.activity = activity
+        }
+    }
+
+    private func saveMyList(customIds: [UUID], standardNames: [String]) async -> Bool {
+        do {
+            savedActivities = try await services.activities.saveActivities(
+                customIds: customIds, standardNames: standardNames, for: user.id)
+            // A standard activity may have just got its row; statuses need it.
+            for row in savedActivities where !activities.contains(where: { $0.id == row.id }) {
+                activities.append(row)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     // MARK: Custom activities

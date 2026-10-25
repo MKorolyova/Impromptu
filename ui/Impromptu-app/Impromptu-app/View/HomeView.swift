@@ -76,17 +76,7 @@ struct HomeView: View {
             .sheet(item: $sheet, onDismiss: refreshAfterSheet) { sheet in
                 switch sheet {
                 case .activities:
-                    ActivityPickerView(
-                        activities: viewModel.activities,
-                        selected: viewModel.draft.activity,
-                        onSelect: { viewModel.draft.activity = $0 },
-                        onCreate: { name, minutes in
-                            await viewModel.createActivity(name: name, durationMinutes: minutes)
-                        },
-                        onDelete: { activity in
-                            Task { await viewModel.deleteActivity(activity) }
-                        }
-                    )
+                    ActivityPickerView(viewModel: viewModel)
                 case .nearbyPeople:
                     NearbyPeopleView(user: viewModel.user, services: services) { self.sheet = .notes }
                 case .notes:
