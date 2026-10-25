@@ -21,6 +21,28 @@ security:
   - apiKey: []
 
 paths:
+  /activities:
+    get:
+      summary: List all standard activities
+      description: |
+        Every standard activity, sorted by name, e.g. to let someone choose activities while registering.
+        Not tied to a user, so it works before the account exists. Custom activities are not included;
+        use `GET /users/{userId}/activities` for a user's full list. Empty until the database is seeded.
+      operationId: listStandardActivities
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activities]
+                properties:
+                  activities:
+                    type: array
+                    items: { $ref: "#/components/schemas/Activity" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /users:
     post:
       summary: Create a user
