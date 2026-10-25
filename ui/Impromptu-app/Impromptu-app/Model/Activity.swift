@@ -58,6 +58,8 @@ struct ActivityChoice: Identifiable, Hashable {
         case standard
         /// A database row the user created.
         case custom(UUID)
+        /// Typed in during sign-up; it becomes a custom row once the account exists.
+        case new
     }
 
     let name: String
@@ -68,11 +70,17 @@ struct ActivityChoice: Identifiable, Hashable {
         switch source {
         case .standard: "standard:\(name)"
         case .custom(let id): "custom:\(id.uuidString)"
+        case .new: "new:\(name.lowercased())"
         }
     }
 
+    /// The user's own, saved or not yet.
     var isCustom: Bool {
-        if case .custom = source { true } else { false }
+        source != .standard
+    }
+
+    var isNew: Bool {
+        source == .new
     }
 
     var customId: UUID? {
@@ -83,6 +91,12 @@ struct ActivityChoice: Identifiable, Hashable {
         name = standard.name
         defaultDurationMinutes = standard.defaultDurationMinutes
         source = .standard
+    }
+
+    init(newNamed name: String, defaultDurationMinutes: Int) {
+        self.name = name
+        self.defaultDurationMinutes = defaultDurationMinutes
+        source = .new
     }
 
     init(custom activity: Activity) {

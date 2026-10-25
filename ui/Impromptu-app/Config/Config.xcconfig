@@ -1,0 +1,10 @@
+// App target settings. Values reach the app through Config/App-Info.plist.
+// `$()` keeps `//` from starting a comment.
+
+// The hosted API on Render.
+API_BASE_URL = https:/$()/impromptu-x5vy.onrender.com/api/v1/
+// Empty sends no Authorization header. The hosted API requires one: set API_KEY in Secrets.xcconfig.
+API_KEY =
+
+// Local overrides (gitignored). Copy Secrets.example.xcconfig to Secrets.xcconfig.
+#include? "Secrets.xcconfig"

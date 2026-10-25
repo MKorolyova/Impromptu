@@ -6,8 +6,9 @@
 import Foundation
 import Observation
 
-/// The sign-up sheet. The account is created after the name step, because picking activities and
-/// connecting a calendar need it; the session only switches to the home screen after the last step.
+/// The sign-up sheet. Nothing is saved until the account is needed (connecting Google Calendar, or the
+/// last step), so until then every step can be revisited and changed. The session only switches to the
+/// home screen after the last step.
 @Observable
 final class RegistrationViewModel {
     enum Step: Int, CaseIterable, Comparable {
@@ -50,23 +51,24 @@ final class RegistrationViewModel {
     var nickname = ""
 
     var query = ""
-    /// Everything the user can pick: their own activities (from the database) on top, then the
-    /// standard ones (the built-in list from `GET /activities`).
+    /// Everything the user can pick: the ones they typed in on top, then the standard ones (the
+    /// built-in list from `GET /activities`).
     private(set) var activities: [ActivityChoice] = []
     /// Picked activities, in the order they were picked. Excludes the defaults.
     private(set) var selectedIds: [ActivityChoice.ID] = []
     private(set) var activitiesLoadError: String?
     /// The list has come back, even if it was empty.
     private(set) var hasLoadedActivities = false
-    private(set) var isAddingActivity = false
 
     private(set) var calendarState: CalendarState = .notConnected
     var statusSources: Set<StatusSource> = [.manual]
 
     private(set) var isWorking = false
     private(set) var errorMessage: String?
-    /// Set once the account exists; there's no going back to the first two steps after that.
+    /// Set once the account exists. After that its email and password can't be changed here.
     private(set) var user: User?
+    /// Rows made for the defaults, so trying again doesn't make them twice.
+    private var defaultActivityIds: [String: UUID] = [:]
 
     private let services: Services
 
@@ -76,24 +78,25 @@ final class RegistrationViewModel {
 
     // MARK: Navigation
 
+    var isAccountCreated: Bool {
+        user != nil
+    }
+
     var canGoBack: Bool {
-        switch step {
-        case .credentials, .activities: false
-        case .profile: user == nil
-        case .calendar, .statusSources: true
-        }
+        step != .credentials && !isWorking
     }
 
     var canContinue: Bool {
         guard !isWorking else { return false }
         switch step {
         case .credentials:
-            return trimmed(email).contains("@") && password.count >= Self.minimumPasswordLength
+            return isAccountCreated
+                || (trimmed(email).contains("@") && password.count >= Self.minimumPasswordLength)
         case .profile:
             return !trimmed(firstName).isEmpty && !trimmed(lastName).isEmpty
                 && trimmed(nickname).count <= Self.maxNicknameLength
         case .activities:
-            return selectedIds.count >= Self.requiredActivityCount && !isAddingActivity
+            return selectedIds.count >= Self.requiredActivityCount
         case .calendar:
             return calendarState != .connecting
         case .statusSources:
@@ -107,21 +110,26 @@ final class RegistrationViewModel {
         move(to: previous)
     }
 
-    /// Does the current step's work, then moves on. The last step signs in.
+    /// Moves to the next step. The last step saves everything and signs in.
     func advance(session: SessionViewModel) async {
         guard canContinue else { return }
         errorMessage = nil
         switch step {
         case .credentials:
-            await checkEmail()
+            if isAccountCreated {
+                move(to: .profile)
+            } else {
+                await checkEmail()
+            }
         case .profile:
-            await createAccount()
+            move(to: .activities)
+            if !hasLoadedActivities { await loadActivities() }
         case .activities:
-            if await saveActivities() { move(to: .calendar) }
+            move(to: .calendar)
         case .calendar:
             move(to: .statusSources)
         case .statusSources:
-            finish(session: session)
+            await finish(session: session)
         }
     }
 
@@ -152,43 +160,48 @@ final class RegistrationViewModel {
         move(to: .profile)
     }
 
-    private func createAccount() async {
-        isWorking = true
-        defer { isWorking = false }
-        let nickname = trimmed(nickname)
+    /// Creates the account the first time it's needed; after that, saves name changes made by going
+    /// back. Nil if that failed, with `errorMessage` saying why.
+    private func ensureAccount() async -> User? {
+        let firstName = trimmed(self.firstName)
+        let lastName = trimmed(self.lastName)
+        let nickname = trimmed(self.nickname).isEmpty ? nil : trimmed(self.nickname)
         do {
-            user = try await services.account.createAccount(CreateUserRequest(
-                email: trimmed(email),
-                password: password,
-                firstName: trimmed(firstName),
-                lastName: trimmed(lastName),
-                nickname: nickname.isEmpty ? nil : nickname
-            ))
-            move(to: .activities)
+            if let existing = user {
+                if existing.firstName != firstName || existing.lastName != lastName || existing.nickname != nickname {
+                    user = try await services.account.updateProfile(
+                        UpdateUserRequest(firstName: firstName, lastName: lastName, nickname: nickname), for: existing.id)
+                }
+            } else {
+                user = try await services.account.createAccount(CreateUserRequest(
+                    email: trimmed(email),
+                    password: password,
+                    firstName: firstName,
+                    lastName: lastName,
+                    nickname: nickname
+                ))
+            }
+            return user
         } catch let error as APIError where error.code == .conflict {
             move(to: .credentials)
             errorMessage = Self.emailTakenMessage
-            return
         } catch {
             errorMessage = error.localizedDescription
-            return
         }
-        await loadActivities()
+        return nil
     }
 
     static let emailTakenMessage = "There's already an account with this email. Sign in instead?"
 
     // MARK: Activities
 
+    /// The standard list needs no account, so this works before one exists.
     func loadActivities() async {
-        guard let user else { return }
         activitiesLoadError = nil
         do {
-            async let standard = services.activities.fetchStandardActivities()
-            // Only the user's own come from the database; a brand-new account usually has none.
-            async let rows = services.activities.fetchActivities(for: user.id)
-            let custom = ((try? await rows) ?? []).filter(\.isCustom)
-            activities = custom.map(ActivityChoice.init(custom:)) + (try await standard).map(ActivityChoice.init(standard:))
+            let standard = try await services.activities.fetchStandardActivities()
+            // Keep any typed in while the list was loading.
+            activities = activities.filter(\.isCustom) + standard.map(ActivityChoice.init(standard:))
             hasLoadedActivities = true
         } catch {
             activitiesLoadError = error.localizedDescription
@@ -213,7 +226,7 @@ final class RegistrationViewModel {
     /// The search turned up nothing, so the search button becomes "Add".
     var canAddSearchedActivity: Bool {
         !trimmedQuery.isEmpty && trimmedQuery.count <= Self.maxActivityNameLength
-            && searchResults.isEmpty && !Self.isDefaultActivity(trimmedQuery) && !isAddingActivity
+            && searchResults.isEmpty && !Self.isDefaultActivity(trimmedQuery)
     }
 
     /// The search is for "Free" or "Do not disturb", which everyone already has.
@@ -237,45 +250,31 @@ final class RegistrationViewModel {
         }
     }
 
-    /// Creates the searched-for name as the user's own activity and picks it.
-    func addSearchedActivity() async {
-        guard canAddSearchedActivity, let user else { return }
-        isAddingActivity = true
-        defer { isAddingActivity = false }
-        do {
-            let activity = ActivityChoice(custom: try await services.activities.createActivity(
-                name: trimmedQuery, durationMinutes: Self.customActivityMinutes, for: user.id))
-            activities.insert(activity, at: 0)
-            selectedIds.append(activity.id)
-            query = ""
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    /// Adds the searched-for name as the user's own activity and picks it. It's created with the account.
+    func addSearchedActivity() {
+        guard canAddSearchedActivity else { return }
+        let activity = ActivityChoice(newNamed: trimmedQuery, defaultDurationMinutes: Self.customActivityMinutes)
+        activities.insert(activity, at: 0)
+        selectedIds.append(activity.id)
+        query = ""
     }
 
-    /// Saves the picks plus the defaults, creating the defaults first if this user doesn't have them yet.
-    private func saveActivities() async -> Bool {
-        guard let user else { return false }
-        isWorking = true
-        defer { isWorking = false }
+    /// Creates the defaults and the typed-in picks as the user's own activities, then saves the picks.
+    /// Rows made by an earlier attempt are reused.
+    private func saveActivities(for user: User) async -> Bool {
         do {
-            // The defaults are the user's own rows; reuse them if a previous attempt already made them.
-            var defaultIds: [UUID] = []
-            for item in Self.defaultActivities {
-                if let existing = activities.first(where: {
-                    $0.isCustom && $0.name.caseInsensitiveCompare(item.name) == .orderedSame
-                })?.customId {
-                    defaultIds.append(existing)
-                } else {
-                    let created = try await services.activities.createActivity(
-                        name: item.name, durationMinutes: item.durationMinutes, for: user.id)
-                    activities.insert(ActivityChoice(custom: created), at: 0)
-                    defaultIds.append(created.id)
-                }
+            for item in Self.defaultActivities where defaultActivityIds[item.name] == nil {
+                defaultActivityIds[item.name] = try await services.activities.createActivity(
+                    name: item.name, durationMinutes: item.durationMinutes, for: user.id).id
+            }
+            for choice in selectedActivities where choice.isNew {
+                let created = try await services.activities.createActivity(
+                    name: choice.name, durationMinutes: choice.defaultDurationMinutes, for: user.id)
+                replace(choice, with: ActivityChoice(custom: created))
             }
             let picked = selectedActivities
             _ = try await services.activities.saveActivities(
-                customIds: defaultIds + picked.compactMap(\.customId),
+                customIds: Self.defaultActivityNames.compactMap { defaultActivityIds[$0] } + picked.compactMap(\.customId),
                 standardNames: picked.filter { !$0.isCustom }.map(\.name),
                 for: user.id
             )
@@ -286,6 +285,11 @@ final class RegistrationViewModel {
         }
     }
 
+    private func replace(_ old: ActivityChoice, with new: ActivityChoice) {
+        if let index = activities.firstIndex(of: old) { activities[index] = new }
+        if let index = selectedIds.firstIndex(of: old.id) { selectedIds[index] = new.id }
+    }
+
     static func isDefaultActivity(_ name: String) -> Bool {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return defaultActivityNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
@@ -293,10 +297,15 @@ final class RegistrationViewModel {
 
     // MARK: Google Calendar
 
-    /// Asks the API where to send the user. Nil if that failed; `calendarState` says why.
+    /// Creates the account if needed, since the connection belongs to it, then asks the API where to
+    /// send the user. Nil if either failed; `errorMessage` or `calendarState` says why.
     func startCalendarConnection() async -> CalendarConnection? {
-        guard let user else { return nil }
+        errorMessage = nil
         calendarState = .connecting
+        guard let user = await ensureAccount() else {
+            calendarState = .notConnected
+            return nil
+        }
         do {
             return try await services.calendar.startGoogleCalendarConnection(for: user.id)
         } catch {
@@ -341,8 +350,10 @@ final class RegistrationViewModel {
         }
     }
 
-    private func finish(session: SessionViewModel) {
-        guard let user else { return }
+    private func finish(session: SessionViewModel) async {
+        isWorking = true
+        defer { isWorking = false }
+        guard let user = await ensureAccount(), await saveActivities(for: user) else { return }
         services.statusPreferences.save(statusSources, for: user.id)
         session.completeRegistration(user)
     }

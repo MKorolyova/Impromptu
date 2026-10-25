@@ -252,6 +252,8 @@ final class HomeViewModel {
             switch choice.source {
             case .custom(let id): !savedCustomIds.contains(id)
             case .standard: !savedStandardNames.contains(choice.name)
+            // Only sign-up makes these.
+            case .new: true
             }
         }
     }
@@ -269,6 +271,8 @@ final class HomeViewModel {
         switch choice.source {
         case .custom(let id): customIds.append(id)
         case .standard: standardNames.append(choice.name)
+        // Not created yet, so there's no id to save; only sign-up makes these.
+        case .new: return false
         }
         return await saveMyList(customIds: customIds, standardNames: standardNames)
     }

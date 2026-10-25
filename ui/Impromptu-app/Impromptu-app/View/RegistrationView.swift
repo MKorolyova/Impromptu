@@ -49,11 +49,9 @@ struct RegistrationView: View {
 
     private var topBar: some View {
         HStack {
-            CircleIconButton(systemImage: "chevron.left", label: "Back") {
-                viewModel.goBack()
-            }
-            .opacity(viewModel.canGoBack ? 1 : 0)
-            .disabled(!viewModel.canGoBack)
+            // Balances the close button so the progress stays centered.
+            Color.clear
+                .frame(width: 36, height: 36)
 
             Spacer()
             StepProgress(current: viewModel.step.rawValue, total: Step.allCases.count)
@@ -67,25 +65,36 @@ struct RegistrationView: View {
         .padding(.top, 20)
     }
 
+    /// Back and Next, on every step. There's nothing to go back to from the first.
     private var footer: some View {
         VStack(spacing: 12) {
             if let errorMessage = viewModel.errorMessage {
                 InlineError(message: errorMessage)
             }
-            Button {
-                Task { await viewModel.advance(session: session) }
-            } label: {
-                if viewModel.isWorking {
-                    ProgressView()
-                        .tint(isSkipping ? Color.brandAccent : Color.onBrandAccent)
-                } else {
-                    Text(primaryTitle)
+            HStack(spacing: 12) {
+                if viewModel.step != .credentials {
+                    Button("Back") { viewModel.goBack() }
+                        .buttonStyle(.brand(.secondary))
+                        .fixedSize()
+                        .disabled(!viewModel.canGoBack)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                 }
+                Button {
+                    Task { await viewModel.advance(session: session) }
+                } label: {
+                    if viewModel.isWorking {
+                        ProgressView()
+                            .tint(isSkipping ? Color.brandAccent : Color.onBrandAccent)
+                    } else {
+                        Text(nextTitle)
+                    }
+                }
+                .buttonStyle(.brand(isSkipping ? .secondary : .primary))
+                .disabled(!viewModel.canContinue)
             }
-            .buttonStyle(.brand(isSkipping ? .secondary : .primary))
-            .disabled(!viewModel.canContinue)
+            .animation(.snappy, value: viewModel.step == .credentials)
 
-            if viewModel.step == .credentials {
+            if viewModel.step == .credentials, !viewModel.isAccountCreated {
                 HStack(spacing: 4) {
                     Text("Already have an account?")
                         .foregroundStyle(.secondary)
@@ -106,13 +115,10 @@ struct RegistrationView: View {
         viewModel.step == .calendar && viewModel.calendarState != .connected
     }
 
-    private var primaryTitle: String {
+    private var nextTitle: String {
         switch viewModel.step {
-        case .credentials: "Continue"
-        case .profile: "Create Account"
-        case .activities:
-            viewModel.remainingActivityCount > 0 ? "Pick \(viewModel.remainingActivityCount) more" : "Continue"
-        case .calendar: isSkipping ? "Skip for Now" : "Continue"
+        case .credentials, .profile, .activities: "Next"
+        case .calendar: isSkipping ? "Skip" : "Next"
         case .statusSources: "Finish"
         }
     }
@@ -166,27 +172,40 @@ private struct CredentialsStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("Email", text: $viewModel.email)
-                .textContentType(.emailAddress)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-                .focused($focusedField, equals: .email)
-                .onSubmit { focusedField = .password }
-                .brandField()
-            SecureField("Password", text: $viewModel.password)
-                .textContentType(.newPassword)
-                .submitLabel(.done)
-                .focused($focusedField, equals: .password)
-                .brandField()
-            Label("At least \(RegistrationViewModel.minimumPasswordLength) characters",
-                  systemImage: passwordIsLongEnough ? "checkmark.circle.fill" : "circle")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(passwordIsLongEnough ? Color.brandAccent : Color.secondary)
-                .animation(.snappy, value: passwordIsLongEnough)
+            Group {
+                TextField("Email", text: $viewModel.email)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.next)
+                    .focused($focusedField, equals: .email)
+                    .onSubmit { focusedField = .password }
+                    .brandField()
+                PasswordField(title: "Password", text: $viewModel.password, contentType: .newPassword,
+                              focus: $focusedField, field: .password)
+                    .submitLabel(.done)
+                    .brandField()
+            }
+            .disabled(viewModel.isAccountCreated)
+
+            if viewModel.isAccountCreated {
+                Label("Your account has been created, so your email and password can't be changed here.",
+                      systemImage: "lock.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Label("At least \(RegistrationViewModel.minimumPasswordLength) characters",
+                      systemImage: passwordIsLongEnough ? "checkmark.circle.fill" : "circle")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(passwordIsLongEnough ? Color.brandAccent : Color.secondary)
+                    .animation(.snappy, value: passwordIsLongEnough)
+            }
         }
-        .onAppear { focusedField = .email }
+        .onAppear {
+            if !viewModel.isAccountCreated { focusedField = .email }
+        }
     }
 }
 
@@ -252,10 +271,7 @@ private struct ActivitiesStep: View {
                 .submitLabel(viewModel.canAddSearchedActivity ? .done : .search)
                 .focused($isSearchFocused)
                 .onSubmit(addIfPossible)
-            if viewModel.isAddingActivity {
-                ProgressView()
-                    .frame(width: 38, height: 38)
-            } else if viewModel.canAddSearchedActivity {
+            if viewModel.canAddSearchedActivity {
                 Button("Add", systemImage: "plus", action: addIfPossible)
                     .buttonStyle(.brand(.primary, compact: true))
                     .transition(.scale.combined(with: .opacity))
@@ -369,8 +385,7 @@ private struct ActivitiesStep: View {
     }
 
     private func addIfPossible() {
-        guard viewModel.canAddSearchedActivity else { return }
-        Task { await viewModel.addSearchedActivity() }
+        withAnimation(.snappy) { viewModel.addSearchedActivity() }
     }
 }
 
@@ -451,10 +466,17 @@ private struct CalendarStep: View {
     }
 
     private func connectButton(title: String) -> some View {
-        Button(action: connect) {
-            Label(title, systemImage: "calendar")
+        VStack(spacing: 8) {
+            Button(action: connect) {
+                Label(title, systemImage: "calendar")
+            }
+            .buttonStyle(.brand)
+            if !viewModel.isAccountCreated {
+                Text("Connecting creates your account first.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .buttonStyle(.brand)
     }
 
     private func connect() {

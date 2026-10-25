@@ -31,10 +31,8 @@ struct SignInView: View {
                         .focused($focusedField, equals: .email)
                         .onSubmit { focusedField = .password }
                         .brandField()
-                    SecureField("Password", text: $viewModel.password)
-                        .textContentType(.password)
+                    PasswordField(title: "Password", text: $viewModel.password, focus: $focusedField, field: .password)
                         .submitLabel(.go)
-                        .focused($focusedField, equals: .password)
                         .onSubmit(submit)
                         .brandField()
                 }

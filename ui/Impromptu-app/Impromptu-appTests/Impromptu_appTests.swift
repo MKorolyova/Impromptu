@@ -200,13 +200,20 @@ struct RegistrationViewModelTests {
         )
     }
 
-    /// Runs the first two steps, which creates the account.
-    private func makeAccount(_ viewModel: RegistrationViewModel, session: SessionViewModel) async {
+    /// Fills in the first two steps. Nothing is saved yet.
+    private func fillInAccount(_ viewModel: RegistrationViewModel, session: SessionViewModel) async {
         viewModel.email = "new@example.com"
         viewModel.password = "password1"
         await viewModel.advance(session: session)
         viewModel.firstName = " Ada "
         viewModel.lastName = "Lovelace"
+        await viewModel.advance(session: session)
+    }
+
+    /// From the activities step: picks five standard ones and goes to the last step.
+    private func pickActivitiesAndSkipCalendar(_ viewModel: RegistrationViewModel, session: SessionViewModel) async {
+        viewModel.activities.filter { !$0.isCustom }.prefix(5).forEach(viewModel.toggle)
+        await viewModel.advance(session: session)
         await viewModel.advance(session: session)
     }
 
@@ -221,22 +228,32 @@ struct RegistrationViewModelTests {
         #expect(viewModel.errorMessage == RegistrationViewModel.emailTakenMessage)
     }
 
-    @Test func accountIsCreatedAfterNamesWithoutSigningIn() async {
+    @Test func everyStepCanBeRevisitedBeforeTheAccountExists() async {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
+        await fillInAccount(viewModel, session: session)
 
         #expect(viewModel.step == .activities)
-        #expect(viewModel.user?.firstName == "Ada")
+        #expect(viewModel.user == nil)
+        #expect(account.user.id == SampleData.user.id)
+        #expect(viewModel.activities.count == activities.standardActivities.count)
+
+        viewModel.goBack()
+        viewModel.goBack()
+        #expect(viewModel.step == .credentials)
         #expect(!viewModel.canGoBack)
-        #expect(session.user == nil)
-        #expect(viewModel.activities.count == SampleData.activities.count)
+
+        viewModel.email = "other@example.com"
+        await viewModel.advance(session: session)
+        await viewModel.advance(session: session)
+        #expect(viewModel.step == .activities)
+        #expect(viewModel.user == nil)
     }
 
-    @Test func needsFiveActivitiesAndSavesDefaults() async {
+    @Test func needsFiveActivities() async {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
+        await fillInAccount(viewModel, session: session)
 
         viewModel.activities.prefix(4).forEach(viewModel.toggle)
         #expect(!viewModel.canContinue)
@@ -247,39 +264,24 @@ struct RegistrationViewModelTests {
         await viewModel.advance(session: session)
 
         #expect(viewModel.step == .calendar)
-        let savedNames = Set(activities.activities.filter { activities.savedIds.contains($0.id) }.map(\.name))
-        #expect(savedNames.isSuperset(of: RegistrationViewModel.defaultActivityNames))
-        #expect(activities.savedIds.count == 7)
-        #expect(activities.savedStandardNames == SampleData.activities.prefix(5).map(\.name))
+        #expect(activities.savedStandardNames.isEmpty)
     }
 
     @Test func standardListComesFromBuiltInEndpointEvenWithEmptyDatabase() async {
         activities.activities = []
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
+        await fillInAccount(viewModel, session: session)
 
         #expect(viewModel.hasLoadedActivities)
         #expect(viewModel.activities.map(\.name) == activities.standardActivities.map(\.name))
         #expect(viewModel.activities.allSatisfy { !$0.isCustom })
     }
 
-    @Test func customActivitiesFromDatabaseGoOnTop() async {
-        let mine = Activity(id: UUID(), ownerId: UUID(), name: "Robotics club", iconId: nil, defaultDurationMinutes: 90, isCustom: true)
-        activities.activities.append(mine)
-        let session = SessionViewModel(services: services)
-        let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
-
-        #expect(viewModel.activities.first?.customId == mine.id)
-        // Standard rows from the database aren't used; only the built-in list.
-        #expect(viewModel.activities.count == 1 + activities.standardActivities.count)
-    }
-
     @Test func searchWithNoMatchOffersAdd() async {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
+        await fillInAccount(viewModel, session: session)
 
         viewModel.query = "Cod"
         #expect(!viewModel.searchResults.isEmpty)
@@ -291,19 +293,24 @@ struct RegistrationViewModelTests {
 
         viewModel.query = "Kitesurfing"
         #expect(viewModel.canAddSearchedActivity)
-        await viewModel.addSearchedActivity()
+        viewModel.addSearchedActivity()
         #expect(viewModel.selectedActivities.map(\.name) == ["Kitesurfing"])
         #expect(viewModel.activities.first?.isCustom == true)
         #expect(viewModel.query.isEmpty)
+        // Not on the server until the account is.
+        #expect(!activities.activities.contains { $0.name == "Kitesurfing" })
     }
 
-    @Test func calendarResultIsReadFromCallback() async {
+    @Test func calendarCreatesTheAccountAndReadsTheCallback() async {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
+        await fillInAccount(viewModel, session: session)
 
         #expect(await viewModel.startCalendarConnection() != nil)
+        #expect(viewModel.user?.email == "new@example.com")
         #expect(viewModel.calendarState == .connecting)
+        #expect(session.user == nil)
+
         viewModel.finishCalendarConnection(callbackURL: URL(string: "impromptu://google-calendar?result=denied")!)
         guard case .failed = viewModel.calendarState else {
             Issue.record("Expected a failure, got \(viewModel.calendarState)")
@@ -314,11 +321,36 @@ struct RegistrationViewModelTests {
         #expect(viewModel.statusSources.contains(.calendar))
     }
 
-    @Test func finishingSavesPreferencesAndSignsIn() async throws {
+    @Test func nameChangedAfterAccountExistsIsSavedAtFinish() async {
         let session = SessionViewModel(services: services)
         let viewModel = RegistrationViewModel(services: services)
-        await makeAccount(viewModel, session: session)
-        viewModel.activities.prefix(5).forEach(viewModel.toggle)
+        await fillInAccount(viewModel, session: session)
+        _ = await viewModel.startCalendarConnection()
+        viewModel.cancelCalendarConnection()
+
+        viewModel.goBack()
+        viewModel.goBack()
+        #expect(viewModel.step == .credentials)
+        #expect(viewModel.isAccountCreated)
+        // Locked, but you can still step through.
+        #expect(viewModel.canContinue)
+        await viewModel.advance(session: session)
+        viewModel.nickname = "Countess"
+        await viewModel.advance(session: session)
+        await pickActivitiesAndSkipCalendar(viewModel, session: session)
+        await viewModel.advance(session: session)
+
+        #expect(account.user.nickname == "Countess")
+        #expect(session.user?.displayName == "Countess")
+    }
+
+    @Test func finishingCreatesAccountSavesEverythingAndSignsIn() async throws {
+        let session = SessionViewModel(services: services)
+        let viewModel = RegistrationViewModel(services: services)
+        await fillInAccount(viewModel, session: session)
+        viewModel.query = "Kitesurfing"
+        viewModel.addSearchedActivity()
+        viewModel.activities.filter { !$0.isCustom }.prefix(4).forEach(viewModel.toggle)
         await viewModel.advance(session: session)
         await viewModel.advance(session: session)
         #expect(viewModel.step == .statusSources)
@@ -327,8 +359,16 @@ struct RegistrationViewModelTests {
         await viewModel.advance(session: session)
 
         let userId = try #require(viewModel.user?.id)
+        #expect(account.user.firstName == "Ada")
         #expect(session.user?.id == userId)
         #expect(preferences.sources(for: userId) == [.manual, .location])
+
+        let kitesurfing = try #require(activities.activities.first { $0.name == "Kitesurfing" })
+        #expect(kitesurfing.isCustom)
+        let savedNames = Set(activities.activities.filter { activities.savedIds.contains($0.id) }.map(\.name))
+        #expect(savedNames.isSuperset(of: RegistrationViewModel.defaultActivityNames + ["Kitesurfing"]))
+        #expect(activities.savedStandardNames == SampleData.activities.prefix(4).map(\.name))
+        #expect(activities.savedIds.count == 7)
     }
 }
 

@@ -1,0 +1,1 @@
+/Users/marynakorolova/Projects/Impromptu/ui/Impromptu-app/Impromptu-app.xcodeproj:1:1 Unable to open base configuration reference file '/Users/marynakorolova/Projects/Impromptu/ui/Impromptu-app/Config/Config.xcconfig'.
