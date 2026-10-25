@@ -1,0 +1,785 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D7BD370C308D7D80002DB116 /* ImpromptuWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D7BD3700308D7D80002DB116 /* ImpromptuWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D7BD36A2308D7D72002DB116 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D7BD368A308D7D70002DB116 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7BD3691308D7D70002DB116;
+			remoteInfo = "Impromptu-app";
+		};
+		D7BD36AC308D7D72002DB116 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D7BD368A308D7D70002DB116 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7BD3691308D7D70002DB116;
+			remoteInfo = "Impromptu-app";
+		};
+		D7BD370D308D7D80002DB116 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D7BD368A308D7D70002DB116 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7BD3704308D7D80002DB116;
+			remoteInfo = ImpromptuWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D7BD370B308D7D80002DB116 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D7BD370C308D7D80002DB116 /* ImpromptuWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D7BD3692308D7D70002DB116 /* Impromptu-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Impromptu-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7BD36A1308D7D72002DB116 /* Impromptu-appTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Impromptu-appTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7BD36AB308D7D72002DB116 /* Impromptu-appUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Impromptu-appUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7BD3700308D7D80002DB116 /* ImpromptuWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ImpromptuWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7BD3711308D7D80002DB116 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		D7BD3712308D7D80002DB116 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.example.xcconfig; sourceTree = "<group>"; };
+		D7BD3713308D7D80002DB116 /* App-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "App-Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D7BD3703308D7D80002DB116 /* Exceptions for "ImpromptuWidget" folder in "ImpromptuWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D7BD3704308D7D80002DB116 /* ImpromptuWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		D7BD3694308D7D70002DB116 /* Impromptu-app */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Impromptu-app";
+			sourceTree = "<group>";
+		};
+		D7BD36A4308D7D72002DB116 /* Impromptu-appTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Impromptu-appTests";
+			sourceTree = "<group>";
+		};
+		D7BD36AE308D7D72002DB116 /* Impromptu-appUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Impromptu-appUITests";
+			sourceTree = "<group>";
+		};
+		D7BD3701308D7D80002DB116 /* ImpromptuWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D7BD3703308D7D80002DB116 /* Exceptions for "ImpromptuWidget" folder in "ImpromptuWidgetExtension" target */,
+			);
+			path = ImpromptuWidget;
+			sourceTree = "<group>";
+		};
+		D7BD3702308D7D80002DB116 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D7BD368F308D7D70002DB116 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD369E308D7D72002DB116 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD36A8308D7D72002DB116 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD3706308D7D80002DB116 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D7BD3689308D7D70002DB116 = {
+			isa = PBXGroup;
+			children = (
+				D7BD3694308D7D70002DB116 /* Impromptu-app */,
+				D7BD3702308D7D80002DB116 /* Shared */,
+				D7BD3701308D7D80002DB116 /* ImpromptuWidget */,
+				D7BD36A4308D7D72002DB116 /* Impromptu-appTests */,
+				D7BD36AE308D7D72002DB116 /* Impromptu-appUITests */,
+				D7BD3710308D7D80002DB116 /* Config */,
+				D7BD3693308D7D70002DB116 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D7BD3693308D7D70002DB116 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D7BD3692308D7D70002DB116 /* Impromptu-app.app */,
+				D7BD36A1308D7D72002DB116 /* Impromptu-appTests.xctest */,
+				D7BD36AB308D7D72002DB116 /* Impromptu-appUITests.xctest */,
+				D7BD3700308D7D80002DB116 /* ImpromptuWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D7BD3710308D7D80002DB116 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				D7BD3711308D7D80002DB116 /* Config.xcconfig */,
+				D7BD3712308D7D80002DB116 /* Secrets.example.xcconfig */,
+				D7BD3713308D7D80002DB116 /* App-Info.plist */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D7BD3691308D7D70002DB116 /* Impromptu-app */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7BD36B5308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-app" */;
+			buildPhases = (
+				D7BD368E308D7D70002DB116 /* Sources */,
+				D7BD368F308D7D70002DB116 /* Frameworks */,
+				D7BD3690308D7D70002DB116 /* Resources */,
+				D7BD370B308D7D80002DB116 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D7BD370E308D7D80002DB116 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D7BD3694308D7D70002DB116 /* Impromptu-app */,
+				D7BD3702308D7D80002DB116 /* Shared */,
+			);
+			name = "Impromptu-app";
+			packageProductDependencies = (
+			);
+			productName = "Impromptu-app";
+			productReference = D7BD3692308D7D70002DB116 /* Impromptu-app.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D7BD36A0308D7D72002DB116 /* Impromptu-appTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7BD36B8308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-appTests" */;
+			buildPhases = (
+				D7BD369D308D7D72002DB116 /* Sources */,
+				D7BD369E308D7D72002DB116 /* Frameworks */,
+				D7BD369F308D7D72002DB116 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D7BD36A3308D7D72002DB116 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D7BD36A4308D7D72002DB116 /* Impromptu-appTests */,
+			);
+			name = "Impromptu-appTests";
+			packageProductDependencies = (
+			);
+			productName = "Impromptu-appTests";
+			productReference = D7BD36A1308D7D72002DB116 /* Impromptu-appTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D7BD36AA308D7D72002DB116 /* Impromptu-appUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7BD36BB308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-appUITests" */;
+			buildPhases = (
+				D7BD36A7308D7D72002DB116 /* Sources */,
+				D7BD36A8308D7D72002DB116 /* Frameworks */,
+				D7BD36A9308D7D72002DB116 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D7BD36AD308D7D72002DB116 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D7BD36AE308D7D72002DB116 /* Impromptu-appUITests */,
+			);
+			name = "Impromptu-appUITests";
+			packageProductDependencies = (
+			);
+			productName = "Impromptu-appUITests";
+			productReference = D7BD36AB308D7D72002DB116 /* Impromptu-appUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		D7BD3704308D7D80002DB116 /* ImpromptuWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7BD3708308D7D80002DB116 /* Build configuration list for PBXNativeTarget "ImpromptuWidgetExtension" */;
+			buildPhases = (
+				D7BD3705308D7D80002DB116 /* Sources */,
+				D7BD3706308D7D80002DB116 /* Frameworks */,
+				D7BD3707308D7D80002DB116 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D7BD3701308D7D80002DB116 /* ImpromptuWidget */,
+				D7BD3702308D7D80002DB116 /* Shared */,
+			);
+			name = ImpromptuWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = ImpromptuWidgetExtension;
+			productReference = D7BD3700308D7D80002DB116 /* ImpromptuWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D7BD368A308D7D70002DB116 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					D7BD3691308D7D70002DB116 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					D7BD36A0308D7D72002DB116 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = D7BD3691308D7D70002DB116;
+					};
+					D7BD36AA308D7D72002DB116 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = D7BD3691308D7D70002DB116;
+					};
+					D7BD3704308D7D80002DB116 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = D7BD368D308D7D70002DB116 /* Build configuration list for PBXProject "Impromptu-app" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D7BD3689308D7D70002DB116;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D7BD3693308D7D70002DB116 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D7BD3691308D7D70002DB116 /* Impromptu-app */,
+				D7BD36A0308D7D72002DB116 /* Impromptu-appTests */,
+				D7BD36AA308D7D72002DB116 /* Impromptu-appUITests */,
+				D7BD3704308D7D80002DB116 /* ImpromptuWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D7BD3690308D7D70002DB116 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD369F308D7D72002DB116 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD36A9308D7D72002DB116 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD3707308D7D80002DB116 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D7BD368E308D7D70002DB116 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD369D308D7D72002DB116 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD36A7308D7D72002DB116 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7BD3705308D7D80002DB116 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D7BD36A3308D7D72002DB116 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D7BD3691308D7D70002DB116 /* Impromptu-app */;
+			targetProxy = D7BD36A2308D7D72002DB116 /* PBXContainerItemProxy */;
+		};
+		D7BD36AD308D7D72002DB116 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D7BD3691308D7D70002DB116 /* Impromptu-app */;
+			targetProxy = D7BD36AC308D7D72002DB116 /* PBXContainerItemProxy */;
+		};
+		D7BD370E308D7D80002DB116 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D7BD3704308D7D80002DB116 /* ImpromptuWidgetExtension */;
+			targetProxy = D7BD370D308D7D80002DB116 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		D7BD36B3308D7D72002DB116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D7BD36B4308D7D72002DB116 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 56TRW45289;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D7BD36B6308D7D72002DB116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D7BD3711308D7D80002DB116 /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Impromptu-app/Impromptu-app.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/App-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D7BD36B7308D7D72002DB116 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D7BD3711308D7D80002DB116 /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Impromptu-app/Impromptu-app.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/App-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D7BD36B9308D7D72002DB116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-appTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Impromptu-app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Impromptu-app";
+			};
+			name = Debug;
+		};
+		D7BD36BA308D7D72002DB116 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-appTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Impromptu-app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Impromptu-app";
+			};
+			name = Release;
+		};
+		D7BD36BC308D7D72002DB116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-appUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Impromptu-app";
+			};
+			name = Debug;
+		};
+		D7BD36BD308D7D72002DB116 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-appUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Impromptu-app";
+			};
+			name = Release;
+		};
+		D7BD3709308D7D80002DB116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ImpromptuWidget/ImpromptuWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ImpromptuWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Impromptu;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-app.ImpromptuWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D7BD370A308D7D80002DB116 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ImpromptuWidget/ImpromptuWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 56TRW45289;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ImpromptuWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Impromptu;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "xhilgerz.Impromptu-app.ImpromptuWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D7BD368D308D7D70002DB116 /* Build configuration list for PBXProject "Impromptu-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7BD36B3308D7D72002DB116 /* Debug */,
+				D7BD36B4308D7D72002DB116 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7BD36B5308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7BD36B6308D7D72002DB116 /* Debug */,
+				D7BD36B7308D7D72002DB116 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7BD36B8308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-appTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7BD36B9308D7D72002DB116 /* Debug */,
+				D7BD36BA308D7D72002DB116 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7BD36BB308D7D72002DB116 /* Build configuration list for PBXNativeTarget "Impromptu-appUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7BD36BC308D7D72002DB116 /* Debug */,
+				D7BD36BD308D7D72002DB116 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7BD3708308D7D80002DB116 /* Build configuration list for PBXNativeTarget "ImpromptuWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7BD3709308D7D80002DB116 /* Debug */,
+				D7BD370A308D7D80002DB116 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D7BD368A308D7D70002DB116 /* Project object */;
+}

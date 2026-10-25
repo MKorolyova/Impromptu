@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
+	<key>APIKey</key>
+	<string>$(API_KEY)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Impromptu uses your location to find people within a mile doing the same thing as you. Your exact location is never shown to anyone.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allow Always so Impromptu can let you know, at most once an hour, when someone new nearby is doing the same thing, even while the app is closed. Your exact location is never shown to anyone.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>xhilgerz.Impromptu-app.nearby-check</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Impromptu connects to a development server on your local network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
