@@ -18,6 +18,12 @@ struct Impromptu_appApp: App {
         let services = Services.live()
         self.services = services
         _session = State(initialValue: SessionViewModel(services: services))
+        // Register before resume(), which schedules the next refresh.
+        BackgroundRefresh.register { [nearbyAlerts = services.nearbyAlerts, noteMonitor = services.noteMonitor] in
+            await nearbyAlerts.performBackgroundCheck()
+            // Also the only chance to hear about note requests and replies while the app is closed.
+            _ = try? await noteMonitor.poll(notify: true)
+        }
         // Must run at launch: iOS relaunches the app in the background for location changes,
         // and only delivers them once monitoring has restarted.
         services.nearbyAlerts.resume()
@@ -29,12 +35,6 @@ struct Impromptu_appApp: App {
                 .environment(\.services, services)
                 .environment(session)
                 .preferredColorScheme(theme.colorScheme)
-        }
-        .backgroundTask(.appRefresh(NearbyAlertsService.backgroundTaskIdentifier)) {
-            [nearbyAlerts = services.nearbyAlerts, noteMonitor = services.noteMonitor] in
-            await nearbyAlerts.performBackgroundCheck()
-            // Also the only chance to hear about note requests and replies while the app is closed.
-            _ = try? await noteMonitor.poll(notify: true)
         }
     }
 }

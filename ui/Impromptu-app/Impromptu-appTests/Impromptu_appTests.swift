@@ -795,11 +795,8 @@ struct NearbyPeopleViewModelTests {
     private func makeViewModel(alertsEnabled: Bool = true) -> (NearbyPeopleViewModel, MockNoteRequestService) {
         let notes = MockNoteRequestService()
         notes.inbox = .empty
-        var services = Services.mock()
-        services = Services(account: services.account, activities: services.activities, statuses: services.statuses,
-                            people: services.people, nearbyAlerts: MockNearbyAlerts(enabled: alertsEnabled),
-                            noteRequests: notes, noteMonitor: MockNoteRequestMonitor(service: notes),
-                            location: services.location, router: services.router, widgets: services.widgets)
+        let services = Services.mock().replacing(nearbyAlerts: MockNearbyAlerts(enabled: alertsEnabled),
+                                                 noteRequests: notes, noteMonitor: MockNoteRequestMonitor(service: notes))
         return (NearbyPeopleViewModel(user: SampleData.user, services: services), notes)
     }
 
@@ -839,10 +836,7 @@ struct NearbyPeopleViewModelTests {
 @MainActor
 struct NotesInboxViewModelTests {
     private func makeViewModel(location: MockLocationProvider? = nil) -> NotesInboxViewModel {
-        let base = Services.mock()
-        let services = Services(account: base.account, activities: base.activities, statuses: base.statuses, people: base.people,
-                                nearbyAlerts: base.nearbyAlerts, noteRequests: base.noteRequests, noteMonitor: base.noteMonitor,
-                                location: location ?? MockLocationProvider(), router: base.router, widgets: base.widgets)
+        let services = Services.mock().replacing(location: location ?? MockLocationProvider())
         return NotesInboxViewModel(user: SampleData.user, services: services)
     }
 
@@ -935,5 +929,25 @@ struct NoteRequestContractTests {
 
     @Test func distanceText() {
         #expect(DistanceText.approximate(300).hasPrefix("~"))
+    }
+}
+
+extension Services {
+    /// A copy with some services swapped, so tests don't break each time `Services` gains a field.
+    func replacing(
+        nearbyAlerts: NearbyAlerting? = nil,
+        noteRequests: NoteRequestServicing? = nil,
+        noteMonitor: NoteRequestMonitoring? = nil,
+        location: LocationProviding? = nil
+    ) -> Services {
+        Services(
+            account: account, activities: activities, friends: friends, calendar: calendar,
+            statusPreferences: statusPreferences, statuses: statuses, people: people,
+            nearbyAlerts: nearbyAlerts ?? self.nearbyAlerts,
+            noteRequests: noteRequests ?? self.noteRequests,
+            noteMonitor: noteMonitor ?? self.noteMonitor,
+            location: location ?? self.location,
+            router: router, widgets: widgets
+        )
     }
 }

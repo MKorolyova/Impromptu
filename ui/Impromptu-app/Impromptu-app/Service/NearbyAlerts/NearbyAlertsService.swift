@@ -31,8 +31,7 @@ protocol NearbyAlerting: AnyObject {
 }
 
 final class NearbyAlertsService: NearbyAlerting {
-    /// Must match BGTaskSchedulerPermittedIdentifiers in Config/App-Info.plist.
-    static let backgroundTaskIdentifier = "xhilgerz.Impromptu-app.nearby-check"
+    static let backgroundTaskIdentifier = BackgroundRefresh.taskIdentifier
     /// About a mile.
     static let radiusMeters = 1600
 
@@ -147,6 +146,8 @@ final class NearbyAlertsService: NearbyAlerting {
     }
 
     private func scheduleBackgroundCheck() {
+        // Submitting without a registered handler raises an uncatchable exception.
+        guard BackgroundRefresh.isRegistered else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskIdentifier)
         request.earliestBeginDate = now().addingTimeInterval(NearbyAlertPolicy.minimumInterval)
         // Fails in the simulator and when Background App Refresh is off; significant changes still work.
