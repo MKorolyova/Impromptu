@@ -1,0 +1,320 @@
+openapi: 3.1.0
+info:
+  title: Impromptu API
+  version: 1.0.0
+  description: |
+    Users, their activities, and statuses (an activity with an optional note and an expiry).
+    Every request needs `Authorization: Bearer <API_KEY>` until user sign-in exists.
+    Deletes are soft: the row stays in the database with `deletedAt` set and is no longer returned.
+servers:
+  - url: http://localhost:3000/api/v1
+security:
+  - apiKey: []
+
+paths:
+  /users:
+    post:
+      summary: Create a user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/{userId}:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: Get a user
+      operationId: getUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Soft-delete a user
+      description: The user is no longer returned, and their email can be used for a new account.
+      operationId: deleteUser
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/activities:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: List activities the user can pick
+      description: The user's custom activities first, then the standard ones, each sorted by name.
+      operationId: listActivities
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activities]
+                properties:
+                  activities:
+                    type: array
+                    items: { $ref: "#/components/schemas/Activity" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add a custom activity
+      operationId: createActivity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateActivityRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activity]
+                properties: { activity: { $ref: "#/components/schemas/Activity" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/{userId}/activities/{activityId}:
+    parameters:
+      - { $ref: "#/components/parameters/userId" }
+      - { $ref: "#/components/parameters/activityId" }
+    get:
+      summary: Get an activity
+      operationId: getActivity
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activity]
+                properties: { activity: { $ref: "#/components/schemas/Activity" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Soft-delete a custom activity
+      description: Standard activities can't be deleted. Existing statuses keep pointing at the activity.
+      operationId: deleteActivity
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/statuses:
+    parameters: [{ $ref: "#/components/parameters/userId" }]
+    get:
+      summary: List the user's statuses, newest first (up to 50)
+      operationId: listStatuses
+      parameters:
+        - name: active
+          in: query
+          description: When `true`, only statuses that have started and not yet expired.
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statuses]
+                properties:
+                  statuses:
+                    type: array
+                    items: { $ref: "#/components/schemas/Status" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Set a status (an activity with an optional note)
+      operationId: createStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateStatusRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties: { status: { $ref: "#/components/schemas/Status" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/statuses/{statusId}:
+    parameters:
+      - { $ref: "#/components/parameters/userId" }
+      - { $ref: "#/components/parameters/statusId" }
+    get:
+      summary: Get a status
+      operationId: getStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties: { status: { $ref: "#/components/schemas/Status" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Soft-delete a status and its note
+      operationId: deleteStatus
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: The server's API_KEY.
+
+  parameters:
+    userId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    activityId: { name: activityId, in: path, required: true, schema: { type: string, format: uuid } }
+    statusId: { name: statusId, in: path, required: true, schema: { type: string, format: uuid } }
+
+  schemas:
+    CreateUserRequest:
+      type: object
+      required: [email, password, firstName, lastName, timezone]
+      properties:
+        email: { type: string, format: email, description: Trimmed and lowercased. }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        nickname: { type: [string, "null"], minLength: 1, maxLength: 50 }
+        timezone: { type: string, description: IANA name, e.g. America/Chicago. }
+
+    User:
+      type: object
+      required: [id, email, firstName, lastName, nickname, timezone, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        nickname: { type: [string, "null"] }
+        timezone: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateActivityRequest:
+      type: object
+      required: [name, defaultDurationMinutes]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50, description: Unique per user, ignoring case. }
+        defaultDurationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+
+    Activity:
+      type: object
+      required: [id, ownerId, name, iconId, defaultDurationMinutes, isCustom, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        ownerId: { type: [string, "null"], format: uuid, description: Null for standard activities. }
+        name: { type: string }
+        iconId: { type: [string, "null"], format: uuid }
+        defaultDurationMinutes: { type: integer }
+        isCustom: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateStatusRequest:
+      type: object
+      required: [activityId]
+      properties:
+        activityId: { type: string, format: uuid, description: A standard activity or one of the user's own. }
+        note: { type: [string, "null"], maxLength: 280 }
+        expiresAt:
+          type: string
+          format: date-time
+          description: Must be in the future. Defaults to now + the activity's defaultDurationMinutes.
+
+    Status:
+      type: object
+      required: [id, userId, note, source, startedAt, expiresAt, createdAt, updatedAt, activity]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        note: { type: [string, "null"] }
+        source: { type: string, enum: [MANUAL, CALENDAR, LOCATION, AUTOMATED] }
+        startedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        activity:
+          type: object
+          required: [id, name, iconId, isCustom]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            iconId: { type: [string, "null"], format: uuid }
+            isCustom: { type: boolean }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHORIZED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED, CONFLICT, RATE_LIMITED, INTERNAL]
+            message: { type: string }
+
+  responses:
+    ValidationFailed:
+      description: The request body or parameters are invalid.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Missing or invalid API key.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Not allowed.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: The user or resource doesn't exist, or was deleted.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: Duplicate email or activity name.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

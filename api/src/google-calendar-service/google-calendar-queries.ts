@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import { db } from "../db/index.ts";
-import { calendarLinks } from "../db/schema.ts";
-import type { GoogleChannel } from "../types/google-channel.ts";
-import { decryptToken, encryptToken } from "../utils/token-encryption.ts";
+import { db } from "@/db/index";
+import { calendarLinks } from "@/db/schema";
+import type { GoogleChannel } from "@/types/google-channel";
+import { decryptToken, encryptToken } from "@/utils/token-encryption";
 
 const GOOGLE = "GOOGLE";
 

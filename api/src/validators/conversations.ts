@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { conversations } from "../db/schema.ts";
-import { createInsertSchema, createSelectSchema, generatedColumns } from "./schema-factory.ts";
+import { conversations } from "@/db/schema";
+import { createInsertSchema, createSelectSchema, generatedColumns } from "@/validators/schema-factory";
 
 export const conversationSchema = createSelectSchema(conversations);
 

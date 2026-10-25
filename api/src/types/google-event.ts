@@ -1,4 +1,4 @@
-import type { GoogleAccessRole } from "./google-calendar.ts";
+import type { GoogleAccessRole } from "@/types/google-calendar";
 
 // Google Calendar v3 event shapes. Only fields this app may use are listed.
 // All-day events use `date` (YYYY-MM-DD); timed events use `dateTime` (RFC 3339).

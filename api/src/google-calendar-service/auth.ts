@@ -1,6 +1,6 @@
-import { env } from "../env.ts";
-import { googleRequest } from "./google-request.ts";
-import type { GoogleTokenResponse, GoogleTokens } from "../types/google-auth.ts";
+import { env } from "@/env";
+import { googleRequest } from "@/google-calendar-service/google-request";
+import type { GoogleTokenResponse, GoogleTokens } from "@/types/google-auth";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";

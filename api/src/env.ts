@@ -11,6 +11,10 @@ export const env = {
   get DATABASE_URL() {
     return requireEnv("DATABASE_URL");
   },
+  // Shared key callers send as `Authorization: Bearer <API_KEY>`.
+  get API_KEY() {
+    return requireEnv("API_KEY");
+  },
   get GOOGLE_CLIENT_ID() {
     return requireEnv("GOOGLE_CLIENT_ID");
   },

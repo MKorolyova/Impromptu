@@ -1,4 +1,4 @@
-import type { GoogleErrorBody } from "../types/google-error.ts";
+import type { GoogleErrorBody } from "@/types/google-error";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 

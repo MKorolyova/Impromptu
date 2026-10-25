@@ -1,4 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { z } from "zod";
+import { hasValidApiKey } from "@/utils/api-auth";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -30,15 +32,6 @@ export function rejectMethod(res: NextApiResponse, allowed: string[]): void {
   res.status(405).json({ error: { code: "VALIDATION_FAILED", message: "Method not allowed" } });
 }
 
-// Routes for local testing only; they take a userId directly because there is no auth yet.
-export function blockOutsideDevelopment(res: NextApiResponse): boolean {
-  if (process.env.NODE_ENV === "production") {
-    sendError(res, "NOT_FOUND", "Not found");
-    return true;
-  }
-  return false;
-}
-
 const CONNECTION_ERROR_CODES = new Set(["CONNECT_TIMEOUT", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT"]);
 
 // Drizzle wraps driver errors, so look at the cause too.
@@ -66,4 +59,37 @@ export function withApiErrors(handler: ApiHandler): ApiHandler {
       sendError(res, "INTERNAL", "Something went wrong");
     }
   };
+}
+
+export const isUniqueViolation = (error: unknown): boolean => {
+  for (let e = error; e instanceof Error; e = e.cause) {
+    if ((e as { code?: string }).code === "23505") return true;
+  }
+  return false;
+};
+
+// Parses input with a zod schema; on failure sends VALIDATION_FAILED and returns null.
+export function parseOrReject<T>(res: NextApiResponse, schema: z.ZodType<T>, input: unknown): T | null {
+  const result = schema.safeParse(input);
+  if (result.success) return result.data;
+  const message = result.error.issues
+    .map((issue) => (issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message))
+    .join("; ");
+  sendError(res, "VALIDATION_FAILED", message);
+  return null;
+}
+
+type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+// One handler per HTTP method, behind the API key, with errors in the standard shape.
+export function apiRoute(handlers: Partial<Record<Method, ApiHandler>>): ApiHandler {
+  const allowed = Object.keys(handlers);
+  return withApiErrors(async (req, res) => {
+    if (!hasValidApiKey(req)) {
+      return sendError(res, "UNAUTHORIZED", "Missing or invalid API key");
+    }
+    const handler = handlers[req.method as Method];
+    if (!handler) return rejectMethod(res, allowed);
+    await handler(req, res);
+  });
 }

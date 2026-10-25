@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { sharingRules } from "../db/schema.ts";
-import { createInsertSchema, createSelectSchema, generatedColumns } from "./schema-factory.ts";
+import { sharingRules } from "@/db/schema";
+import { createInsertSchema, createSelectSchema, generatedColumns } from "@/validators/schema-factory";
 
 export const sharingRuleSchema = createSelectSchema(sharingRules);
 

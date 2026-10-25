@@ -11,3 +11,6 @@ export const generatedColumns = {
   createdAt: true,
   updatedAt: true,
 } as const;
+
+// For soft-deletable tables; deletedAt is only set by delete endpoints.
+export const softDeletableColumns = { ...generatedColumns, deletedAt: true } as const;

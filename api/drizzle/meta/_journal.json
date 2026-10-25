@@ -15,6 +15,13 @@
       "when": 1792889777444,
       "tag": "0001_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792899428703,
+      "tag": "0002_soft_delete_activities_statuses",
+      "breakpoints": true
     }
   ]
 }

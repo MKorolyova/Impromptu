@@ -1,8 +1,8 @@
-import { googleRequest } from "./google-request.ts";
-import type { GoogleCalendarList, GoogleCalendarListEntry } from "../types/google-calendar.ts";
-import type { GoogleChannel, WatchGoogleEventsInput } from "../types/google-channel.ts";
-import type { GoogleEvent, GoogleEventList, ListGoogleEventsInput, ListGoogleEventsResult } from "../types/google-event.ts";
-import type { GoogleFreeBusyResponse, GoogleTimePeriod } from "../types/google-free-busy.ts";
+import { googleRequest } from "@/google-calendar-service/google-request";
+import type { GoogleCalendarList, GoogleCalendarListEntry } from "@/types/google-calendar";
+import type { GoogleChannel, WatchGoogleEventsInput } from "@/types/google-channel";
+import type { GoogleEvent, GoogleEventList, ListGoogleEventsInput, ListGoogleEventsResult } from "@/types/google-event";
+import type { GoogleFreeBusyResponse, GoogleTimePeriod } from "@/types/google-free-busy";
 
 const CALENDAR_API_URL = "https://www.googleapis.com/calendar/v3";
 const PRIMARY_CALENDAR = "primary";

@@ -43,7 +43,8 @@ export const users = pgTable("users", {
     ...timestamps,
     ...softDelete,
   },
-  (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)],
+  // Soft-deleted users free their email for a new account.
+  (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`).where(sql`${t.deletedAt} IS NULL`)],
 );
 
 export const friendships = pgTable("friendships", {
@@ -69,10 +70,14 @@ export const activities = pgTable("activities", {
     // false = one of the standard activities from constants/activities.ts.
     isCustom: boolean().notNull().default(false),
     ...timestamps,
+    ...softDelete,
   },
   (t) => [
     index().on(t.ownerId),
     uniqueIndex("activities_standard_name_unique").on(t.name).where(sql`${t.ownerId} IS NULL`),
+    uniqueIndex("activities_custom_name_unique")
+      .on(t.ownerId, sql`lower(${t.name})`)
+      .where(sql`${t.ownerId} IS NOT NULL AND ${t.deletedAt} IS NULL`),
     check("activities_custom_has_owner", sql`${t.isCustom} = (${t.ownerId} IS NOT NULL)`),
     check("activities_duration_positive", sql`${t.defaultDurationMinutes} > 0`),
   ],
@@ -98,6 +103,7 @@ export const statuses = pgTable("statuses", {
     startedAt: timestamptz().notNull().defaultNow(),
     expiresAt: timestamptz().notNull(),
     ...timestamps,
+    ...softDelete,
   },
   (t) => [
     index().on(t.userId, t.expiresAt),
