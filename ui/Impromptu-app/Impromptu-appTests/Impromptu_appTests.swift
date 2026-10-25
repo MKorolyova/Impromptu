@@ -641,46 +641,61 @@ struct NearbyAlertPolicyTests {
     private let sam = UUID(), jo = UUID(), priya = UUID()
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
-    @Test func firstMatchNotifies() {
-        let (decision, state) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
-        #expect(decision == .notify(newUserIds: [sam]))
-        #expect(state.announcedUserIds == [sam])
-        #expect(state.lastNotifiedAt == start)
+    /// You've just started coding with Sam already nearby.
+    private var started: NearbyAlertState {
+        NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start).state
+    }
+
+    @Test func startingAnActivityAnnouncesNobodyAlreadyThere() {
+        let (decision, state) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam, jo], now: start)
+        #expect(decision == .skip(.justStarted))
+        #expect(state.announcedUserIds == [sam, jo])
+        #expect(state.lastNotifiedAt == nil)
+    }
+
+    @Test func someoneWhoStartsLaterIsAnnounced() {
+        let (decision, state) = NearbyAlertPolicy.evaluate(state: started, activityId: coding, matchingUserIds: [sam, jo],
+                                                           now: start.addingTimeInterval(5))
+        #expect(decision == .notify(newUserIds: [jo]))
+        #expect(state.lastNotifiedAt == start.addingTimeInterval(5))
     }
 
     @Test func sameUsersAnHourLaterSendNothing() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam, jo], now: start)
+        let (_, first) = NearbyAlertPolicy.evaluate(state: started, activityId: coding, matchingUserIds: [sam, jo], now: start)
         let (decision, _) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [jo, sam],
                                                        now: start.addingTimeInterval(2 * 3600))
         #expect(decision == .skip(.nothingNew))
     }
 
     @Test func newUserWithinTheMinuteWaitsThenNotifies() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
+        let (_, first) = NearbyAlertPolicy.evaluate(state: started, activityId: coding, matchingUserIds: [sam, priya], now: start)
 
-        let (early, waiting) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [sam, jo],
+        let (early, waiting) = NearbyAlertPolicy.evaluate(state: first, activityId: coding, matchingUserIds: [sam, priya, jo],
                                                           now: start.addingTimeInterval(30))
         #expect(early == .skip(.tooSoon))
         #expect(!waiting.announcedUserIds.contains(jo))
 
-        let (later, _) = NearbyAlertPolicy.evaluate(state: waiting, activityId: coding, matchingUserIds: [sam, jo],
+        let (later, _) = NearbyAlertPolicy.evaluate(state: waiting, activityId: coding, matchingUserIds: [sam, priya, jo],
                                                     now: start.addingTimeInterval(61))
         #expect(later == .notify(newUserIds: [jo]))
     }
 
-    @Test func changingActivityStartsOverButKeepsTimeLimit() {
-        let (_, first) = NearbyAlertPolicy.evaluate(state: .init(), activityId: coding, matchingUserIds: [sam], now: start)
+    @Test func changingActivityAnnouncesNobodyButKeepsTimeLimit() {
+        let (_, notified) = NearbyAlertPolicy.evaluate(state: started, activityId: coding, matchingUserIds: [sam, jo], now: start)
         let studying = UUID()
 
-        let (soon, rebased) = NearbyAlertPolicy.evaluate(state: first, activityId: studying, matchingUserIds: [sam],
-                                                         now: start.addingTimeInterval(30))
-        #expect(soon == .skip(.tooSoon))
+        let (changed, rebased) = NearbyAlertPolicy.evaluate(state: notified, activityId: studying, matchingUserIds: [sam],
+                                                            now: start.addingTimeInterval(10))
+        #expect(changed == .skip(.justStarted))
         #expect(rebased.activityId == studying)
-        #expect(rebased.announcedUserIds.isEmpty)
+        #expect(rebased.announcedUserIds == [sam])
 
-        let (later, _) = NearbyAlertPolicy.evaluate(state: rebased, activityId: studying, matchingUserIds: [sam],
-                                                    now: start.addingTimeInterval(2 * 3600))
-        #expect(later == .notify(newUserIds: [sam]))
+        let (soon, _) = NearbyAlertPolicy.evaluate(state: rebased, activityId: studying, matchingUserIds: [sam, priya],
+                                                   now: start.addingTimeInterval(30))
+        #expect(soon == .skip(.tooSoon))
+        let (later, _) = NearbyAlertPolicy.evaluate(state: rebased, activityId: studying, matchingUserIds: [sam, priya],
+                                                    now: start.addingTimeInterval(61))
+        #expect(later == .notify(newUserIds: [priya]))
     }
 
     @Test func noStatusNeverNotifies() {
@@ -758,16 +773,30 @@ struct NearbyAlertsServiceTests {
         #expect(notifications.posted.isEmpty)
     }
 
-    @Test func withoutPushThePhoneNotifiesOnceForSamePeople() async {
+    /// Someone who starts coding near you after you did.
+    private func someoneStartsLater() {
+        var marcus = SampleData.people[3]
+        marcus.distanceMeters = 900
+        api.result.users.append(marcus)
+    }
+
+    @Test func withoutPushThePhoneAnnouncesOnlyPeopleWhoStartLater() async {
         var clock = Date(timeIntervalSince1970: 1_800_000_000)
         let service = makeService(now: { clock })
         _ = await service.enable()
 
+        // The three already coding nearby when you started aren't news.
         await service.performBackgroundCheck()
         #expect(api.sharedLocations.count == 1)
+        #expect(notifications.posted.isEmpty)
+
+        someoneStartsLater()
+        clock.addTimeInterval(120)
+        await service.performBackgroundCheck()
         #expect(notifications.posted.count == 1)
         #expect(notifications.posted.first?.route == .nearbyPeople)
-        #expect(notifications.posted.first?.title == "3 new people nearby")
+        #expect(notifications.posted.first?.title == "Marcus is nearby")
+        #expect(notifications.posted.first?.body == "Marcus is also coding within 3 miles. 4 people nearby in all.")
 
         clock.addTimeInterval(2 * 3600)
         await service.performBackgroundCheck()
@@ -780,6 +809,10 @@ struct NearbyAlertsServiceTests {
 
         let result = try await service.refreshInForeground()
         #expect(result.users.count == 3)
+        #expect(notifications.posted.isEmpty)
+
+        someoneStartsLater()
+        _ = try await service.refreshInForeground()
         #expect(notifications.posted.count == 1)
     }
 

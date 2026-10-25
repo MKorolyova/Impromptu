@@ -15,7 +15,7 @@ export default apiRoute({
   },
 
   // POST /api/v1/users/{userId}/statuses — sets an activity with an optional note. People within 3 miles
-  // doing the same activity, and the user, then get a push about each other.
+  // already doing the same activity then get a push about the user.
   async POST(req, res) {
     const user = await requireUser(req, res);
     if (!user) return;

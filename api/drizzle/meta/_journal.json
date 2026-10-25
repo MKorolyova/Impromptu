@@ -64,6 +64,20 @@
       "when": 1792941156680,
       "tag": "0008_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792943044938,
+      "tag": "0009_drop_nearby_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792943057215,
+      "tag": "0010_nearby_alerts_per_status",
+      "breakpoints": true
     }
   ]
 }

@@ -21,8 +21,9 @@ info:
     "Nearby" means within 3 miles (4828 m) everywhere: `GET /users/{userId}/nearby` by default, who
     can be asked for a note, and push alerts. When someone sets a status (by hand or from their
     calendar) or reports a position, the server finds everyone nearby whose current status has the same
-    activity and sends Apple push notifications both ways: each of them gets "<name> is nearby", and the
-    user gets one notification naming all of them. Each person hears about each status once. Only
+    activity and sends each of them an Apple push notification, "<name> is nearby". The person who set
+    the status or moved gets none: the people already doing it aren't news to them. Each person hears
+    about someone at most once per status of their own, so status updates don't repeat it. Only
     devices registered with `POST /users/{userId}/device-tokens` get them, and only when the server has
     `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` and `APNS_BUNDLE_ID` set. The push payload has
     `route: "nearbyPeople"` next to `aps`, naming the screen a tap should open.
@@ -483,7 +484,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       summary: Set a status (an activity with an optional note)
-      description: Afterwards, people nearby doing the same activity and the user get push alerts about each other.
+      description: Afterwards, people nearby already doing the same activity get a push alert about the user.
       operationId: createStatus
       requestBody:
         required: true
@@ -536,7 +537,7 @@ paths:
       description: |
         Used only to find people nearby; never returned to anyone. Positions older than 2 hours are
         ignored, so people who stop reporting drop out of `nearby` on their own. Afterwards, anyone now
-        nearby doing the same activity and the user get push alerts about each other.
+        nearby doing the same activity who hasn't heard about the user yet gets a push alert.
       operationId: updateLocation
       requestBody:
         required: true

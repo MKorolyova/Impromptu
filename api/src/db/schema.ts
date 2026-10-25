@@ -183,14 +183,15 @@ export const deviceTokens = pgTable("device_tokens", {
   (t) => [index().on(t.userId)],
 );
 
-// Who has been told about which status by a nearby push alert, so each match is announced once.
+// Nearby push alerts already accounted for: during the recipient's status, they've been told about this
+// other person, or the person was already nearby when the status began (so it's no news). Each person is
+// announced at most once per status of the recipient.
 export const nearbyAlerts = pgTable("nearby_alerts", {
-    recipientId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
-    // The other person's status, which matched the recipient's activity nearby.
-    statusId: uuid().notNull().references(() => statuses.id, { onDelete: "cascade" }),
+    recipientStatusId: uuid().notNull().references(() => statuses.id, { onDelete: "cascade" }),
+    otherUserId: uuid().notNull().references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.recipientId, t.statusId] }), index().on(t.statusId)],
+  (t) => [primaryKey({ columns: [t.recipientStatusId, t.otherUserId] }), index().on(t.otherUserId)],
 );
 
 // One user asking someone nearby for a note; answered with text, and optionally a place and a position.

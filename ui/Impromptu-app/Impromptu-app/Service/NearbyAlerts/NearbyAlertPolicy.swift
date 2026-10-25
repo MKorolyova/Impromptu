@@ -9,7 +9,7 @@ import Foundation
 nonisolated struct NearbyAlertState: Codable, Equatable, Sendable {
     /// The activity the people below were matched on. A different activity starts over.
     var activityId: UUID?
-    /// Everyone you've already been told about.
+    /// Everyone you've been told about, or who was already there when you started the activity.
     var announcedUserIds: Set<UUID> = []
     var lastNotifiedAt: Date?
 }
@@ -21,6 +21,8 @@ nonisolated enum NearbyAlertDecision: Equatable, Sendable {
     enum Reason: Equatable, Sendable {
         /// You have no active status, so there's nothing to match.
         case noStatus
+        /// You just started this activity, so the people already doing it aren't news to you.
+        case justStarted
         /// Everyone nearby was already announced.
         case nothingNew
         /// Less than `minimumInterval` since the last notification; they'll be announced next time.
@@ -29,10 +31,11 @@ nonisolated enum NearbyAlertDecision: Equatable, Sendable {
 }
 
 /// The rules for nearby notifications the phone sends itself, which it only does when it can't get the
-/// server's push notifications (see `NearbyAlertsService`):
-/// - at most one per `minimumInterval` (a minute);
-/// - only when someone new matches; if everyone was already announced, nothing is sent;
-/// - changing your activity starts over, since the matches are for a different activity.
+/// server's push notifications (see `NearbyAlertsService`). Like the server's, they tell you when someone
+/// starts doing what you're already doing, not about who was there when you started:
+/// - starting an activity (or changing to another) announces nobody; whoever matches then is noted;
+/// - after that, only someone new is announced, at most once;
+/// - at most one notification per `minimumInterval` (a minute).
 nonisolated enum NearbyAlertPolicy {
     static let minimumInterval: TimeInterval = 60
 
@@ -42,9 +45,14 @@ nonisolated enum NearbyAlertPolicy {
         matchingUserIds: [UUID],
         now: Date
     ) -> (decision: NearbyAlertDecision, state: NearbyAlertState) {
-        var state = rebased(state, on: activityId)
-        guard activityId != nil else { return (.skip(.noStatus), state) }
+        guard let activityId else { return (.skip(.noStatus), rebased(state, on: nil)) }
+        guard state.activityId == activityId else {
+            var started = rebased(state, on: activityId)
+            started.announcedUserIds = Set(matchingUserIds)
+            return (.skip(.justStarted), started)
+        }
 
+        var state = state
         let newIds = matchingUserIds.filter { !state.announcedUserIds.contains($0) }
         guard !newIds.isEmpty else { return (.skip(.nothingNew), state) }
 

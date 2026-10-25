@@ -6,7 +6,7 @@ import { updateLocationRequestSchema } from "@/validators/locations";
 
 export default apiRoute({
   // PUT /api/v1/users/{userId}/location — the user's current position, for finding people nearby. Anyone
-  // the move brings within 3 miles who's doing the same activity gets a push, and so does the user.
+  // the move brings within 3 miles who's doing the same activity gets a push about the user.
   async PUT(req, res) {
     const user = await requireUser(req, res);
     if (!user) return;
