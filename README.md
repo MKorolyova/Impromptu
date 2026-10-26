@@ -29,7 +29,7 @@ Location is private by design. Your exact position is never shown to anyone. Dis
 - **Routes:** one handler per HTTP method, with errors in a standard `{ error: { code, message } }` shape.
 - **Validation:** every request body is checked with **Zod**.
 - **Database:** **Drizzle ORM** over **PostgreSQL with PostGIS** on Tiger Cloud. `ST_DWithin` and `ST_Distance` on geography types answer "who's within a mile, closest first".
-- **Background jobs:** one runs every minute, turning Google Calendar events that just started into statuses, with **Gemini** classifying each event.
+- **Background jobs:** one runs every 30 seconds, turning Google Calendar events that just started into statuses, with **Gemini** classifying each event.
 - **Docs:** `api/openapi.yaml` documents every route.
 
 ## Challenges we ran into

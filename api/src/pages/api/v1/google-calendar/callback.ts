@@ -38,10 +38,10 @@ export default apiRoute(
       }
       backToApp(res, "connected");
 
-      // Pick up an event that's already in progress without waiting for the next minute.
+      // Pick up an event that's already in progress without waiting for the next run.
       const user = await getUserById(userId);
       if (user) {
-        checkGoogleCalendar({ userId, timeZone: user.timezone }, { refresh: true }).catch((err) =>
+        checkGoogleCalendar({ userId, timeZone: user.timezone }).catch((err) =>
           console.error(`First Google Calendar check failed: ${(err as Error).message}`),
         );
       }

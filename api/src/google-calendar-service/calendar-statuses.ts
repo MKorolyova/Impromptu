@@ -7,7 +7,7 @@ import {
   type GoogleCalendarUser,
 } from "@/google-calendar-service/google-calendar-queries";
 import { GoogleApiError } from "@/google-calendar-service/google-request";
-import { forgetGoogleAccessToken, readGoogleCalendarEvents } from "@/google-calendar-service/read-google-calendar";
+import { forgetGoogleCalendarCache, readGoogleCalendarEvents } from "@/google-calendar-service/read-google-calendar";
 import { announceNearbyMatchesLater } from "@/locations-service/nearby-alerts";
 import {
   createCalendarStatus,
@@ -19,15 +19,13 @@ import {
 import type { CalendarEvent } from "@/types/calendar-event";
 import { endOfLocalDay, localDateKey } from "@/utils/time-zone";
 
-// How often the rest of today's events are re-read from Google.
-const REFRESH_EVERY_MS = 15 * 60 * 1000;
-// While Gemini is rate limited, keep retrying each minute for this long, then use the fallback rule.
+// While Gemini is rate limited, keep retrying on each run for this long, then use the fallback rule.
 const WAIT_FOR_GEMINI_MS = 5 * 60 * 1000;
 const SKIPPED_EVENT_TYPES = new Set(["outOfOffice", "workingLocation", "birthday"]);
 
-// The rest of the user's day, kept in memory only. `handled` holds event starts already turned
-// into statuses, so Gemini isn't asked twice.
-type TodaySchedule = { dayKey: string; fetchedAt: number; events: CalendarEvent[]; handled: Set<string> };
+// Event starts already turned into statuses (or given up on) today, so Gemini isn't asked twice.
+// In memory only; after a restart, hasCalendarStatus keeps statuses from being made again.
+type TodaySchedule = { dayKey: string; handled: Set<string> };
 
 // On globalThis so API routes and the background job share it, and it survives dev reloads.
 const globalForCalendar = globalThis as typeof globalThis & {
@@ -70,25 +68,6 @@ async function reconcileActiveStatuses(userId: string, events: CalendarEvent[], 
   }
 }
 
-async function refreshSchedule(user: GoogleCalendarUser, now: Date): Promise<TodaySchedule | null> {
-  const events = await readTodayGoogleCalendarEvents(user, now);
-  if (!events) {
-    schedules.delete(user.userId);
-    return null;
-  }
-  const dayKey = localDateKey(user.timeZone, now);
-  const previous = schedules.get(user.userId);
-  const schedule: TodaySchedule = {
-    dayKey,
-    fetchedAt: now.getTime(),
-    events,
-    handled: previous?.dayKey === dayKey ? previous.handled : new Set(),
-  };
-  schedules.set(user.userId, schedule);
-  await reconcileActiveStatuses(user.userId, events, now);
-  return schedule;
-}
-
 // Classifies a started event with Gemini and saves it as a CALENDAR status with the event's times.
 async function startStatusForEvent(
   user: GoogleCalendarUser,
@@ -106,7 +85,7 @@ async function startStatusForEvent(
 
   const waitIfRateLimited = Date.now() - startedAt.getTime() < WAIT_FOR_GEMINI_MS;
   const classification = await classifyCalendarEvent(event, user.timeZone, { waitIfRateLimited });
-  // Rate limited: leave it unhandled so the next minute's run tries again.
+  // Rate limited: leave it unhandled so the next run tries again.
   if (!classification) return false;
   const { activityName } = classification;
   const definition = ACTIVITIES.find((activity) => activity.name === activityName);
@@ -130,39 +109,38 @@ async function startStatusForEvent(
   return status !== null;
 }
 
-// Re-reads today's events when the cache is stale (or `refresh` is set), then turns every event
-// that has started and not ended into a status. Returns null when Google isn't connected.
-export async function checkGoogleCalendar(
-  user: GoogleCalendarUser,
-  { refresh = false }: { refresh?: boolean } = {},
-): Promise<CalendarCheckResult | null> {
+// Reads the rest of today from Google, every event whenever it was created, so events added, moved or
+// cancelled count by the next run, 30 seconds later. Keeps existing calendar statuses in step, then turns every
+// event that has started and not ended into a status. Returns null when Google isn't connected.
+export async function checkGoogleCalendar(user: GoogleCalendarUser): Promise<CalendarCheckResult | null> {
   const now = new Date();
-  let schedule = schedules.get(user.userId);
-  if (
-    refresh ||
-    !schedule ||
-    schedule.dayKey !== localDateKey(user.timeZone, now) ||
-    now.getTime() - schedule.fetchedAt >= REFRESH_EVERY_MS
-  ) {
-    schedule = await refreshSchedule(user, now);
-    if (!schedule) return null;
+  const events = await readTodayGoogleCalendarEvents(user, now);
+  if (!events) {
+    schedules.delete(user.userId);
+    return null;
   }
+  const dayKey = localDateKey(user.timeZone, now);
+  const previous = schedules.get(user.userId);
+  const schedule: TodaySchedule = previous?.dayKey === dayKey ? previous : { dayKey, handled: new Set() };
+  schedules.set(user.userId, schedule);
+  await reconcileActiveStatuses(user.userId, events, now);
 
   let statusesStarted = 0;
-  for (const event of schedule.events) {
+  for (const event of events) {
     if (!becomesStatus(event)) continue;
     if (new Date(event.startAt) > now || new Date(event.endAt) <= now) continue;
     if (await startStatusForEvent(user, event, schedule)) statusesStarted++;
   }
-  return { eventsToday: schedule.events.length, statusesStarted };
+  return { eventsToday: events.length, statusesStarted };
 }
 
 export function forgetGoogleCalendarUser(userId: string): void {
   schedules.delete(userId);
-  forgetGoogleAccessToken(userId);
+  forgetGoogleCalendarCache(userId);
 }
 
-// Runs every minute: checks every connected user. One failing user doesn't stop the rest.
+// Runs every 30 seconds: checks every connected user. One failing user doesn't stop the rest. A run that
+// takes longer than that is never overlapped by the next one.
 export async function runGoogleCalendarTick(): Promise<void> {
   if (globalForCalendar.calendarTickRunning) return;
   globalForCalendar.calendarTickRunning = true;

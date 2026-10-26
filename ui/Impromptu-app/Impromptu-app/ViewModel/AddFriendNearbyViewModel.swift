@@ -33,6 +33,10 @@ final class AddFriendNearbyViewModel {
     private(set) var peers: [NearbyPeer] = []
     /// False once the user turns down Nearby Interactions; then it's the list, like on older iPhones.
     private(set) var isDistanceAllowed = true
+    /// Phones found but still connecting, so the list can say something's happening.
+    private(set) var connectingCount = 0
+    /// Why iOS won't let the app look for phones at all.
+    private(set) var searchError: String?
     let canMeasureDistance: Bool
 
     /// People who accepted you, ready for when you accept them.
@@ -98,6 +102,10 @@ final class AddFriendNearbyViewModel {
             }
         case .distanceNotAllowed:
             isDistanceAllowed = false
+        case .connecting(let count):
+            connectingCount = count
+        case .searchFailed(let message):
+            searchError = message
         }
     }
 

@@ -1064,6 +1064,23 @@ struct AddFriendNearbyViewModelTests {
         #expect(!viewModel.usesTouch)
     }
 
+    @Test func saysWhenAPhoneIsFoundButStillConnecting() {
+        let viewModel = makeViewModel()
+        finder.send(.connecting(count: 1))
+        #expect(viewModel.connectingCount == 1)
+        finder.send(.updated(priya(at: 0.6)))
+        finder.send(.connecting(count: 0))
+        #expect(viewModel.connectingCount == 0)
+        #expect(viewModel.peers.count == 1)
+    }
+
+    @Test func showsWhyItCantLook() {
+        let viewModel = makeViewModel()
+        #expect(viewModel.searchError == nil)
+        finder.send(.searchFailed("iOS stopped Impromptu from looking for phones nearby (error -72008)."))
+        #expect(viewModel.searchError?.contains("-72008") == true)
+    }
+
     @Test func messagesBetweenPhonesRoundTrip() throws {
         let hello = NearbyFriendMessage.hello(priya(at: nil).identity, distanceToken: Data([1, 2, 3]))
         for message in [hello, .accept, .decline] {

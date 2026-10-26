@@ -5,12 +5,12 @@ import { requireUser } from "@/utils/route-params";
 
 export default apiRoute({
   // POST /api/v1/users/{userId}/google-calendar/check — re-reads today's events now and creates
-  // statuses for events that have started, instead of waiting for the next minute's run.
+  // statuses for events that have started, instead of waiting for the next 30-second run.
   async POST(req, res) {
     const user = await requireUser(req, res);
     if (!user) return;
     try {
-      const result = await checkGoogleCalendar({ userId: user.id, timeZone: user.timezone }, { refresh: true });
+      const result = await checkGoogleCalendar({ userId: user.id, timeZone: user.timezone });
       if (!result) return sendError(res, "NOT_FOUND", "Google Calendar is not connected");
       res.status(200).json({ check: result });
     } catch (error) {

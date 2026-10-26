@@ -154,19 +154,43 @@ private struct NearbyPeopleList: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Nearby")
                 .font(.headline)
-            if viewModel.peers.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+            if let error = viewModel.searchError {
+                VStack(alignment: .leading, spacing: 10) {
+                    InlineError(message: error)
+                    Text("Turn on Local Network for \(Brand.appName) in Settings → Privacy & Security → Local Network, then open this screen again.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    }
+                    .buttonStyle(.brand(.secondary, compact: true))
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .insetBackground()
+            } else if viewModel.peers.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Looking for phones with Add Friend open…")
+                        Text(searchingText)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     if showsHelp {
-                        Text("Both phones need Bluetooth and Wi-Fi on, and \(Brand.appName) allowed to find local devices.")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Still nothing? Check that:")
+                                .font(.footnote.weight(.semibold))
+                            Group {
+                                Text("• Your friend has this screen open on their iPhone")
+                                Text("• Wi-Fi and Bluetooth are on, on both phones (no need to join a network)")
+                                Text("• Local Network is on for \(Brand.appName): Settings → Privacy & Security → Local Network")
+                            }
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .transition(.opacity)
+                        }
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
                     }
                 }
                 .padding(14)
@@ -188,6 +212,14 @@ private struct NearbyPeopleList: View {
                 .padding(.horizontal, 12)
                 .insetBackground()
             }
+        }
+    }
+
+    private var searchingText: String {
+        switch viewModel.connectingCount {
+        case 0: "Looking for phones with Add Friend open…"
+        case 1: "Found a phone, connecting…"
+        default: "Found \(viewModel.connectingCount) phones, connecting…"
         }
     }
 

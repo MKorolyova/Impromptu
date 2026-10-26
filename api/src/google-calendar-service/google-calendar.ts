@@ -41,6 +41,15 @@ export async function listGoogleCalendars(accessToken: string): Promise<GoogleCa
   return calendars;
 }
 
+// The calendars whose events are the user's own plans: their primary calendar, plus any other calendar
+// they own and show in Google Calendar (say Work or Classes). Calendars shared with them or subscribed to
+// hold other people's plans, so they're left out.
+export function ownCalendarIds(calendars: GoogleCalendarListEntry[]): string[] {
+  return calendars
+    .filter((calendar) => !calendar.deleted && (calendar.primary || (calendar.accessRole === "owner" && calendar.selected)))
+    .map((calendar) => calendar.id);
+}
+
 // Reads every page. Recurring events are expanded into single instances.
 // With a syncToken, a GoogleApiError with isSyncTokenExpired means a full sync is needed.
 export async function listGoogleEvents(

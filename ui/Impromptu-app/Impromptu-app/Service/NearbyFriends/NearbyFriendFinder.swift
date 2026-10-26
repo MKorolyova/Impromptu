@@ -36,6 +36,10 @@ enum NearbyFriendEvent: Equatable {
     case declined(peerId: String)
     /// The user turned down Nearby Interactions, so distances won't be measured.
     case distanceNotAllowed
+    /// Phones found but not introduced yet (still connecting), so the screen can say so.
+    case connecting(count: Int)
+    /// iOS wouldn't let the app look for phones, e.g. Local Network access is off.
+    case searchFailed(String)
 }
 
 /// Finds other phones with Add Friend open and introduces you, without the server: Multipeer
@@ -62,6 +66,12 @@ nonisolated enum NearbyFriendMessage: Codable, Equatable {
 final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
     /// Must match NSBonjourServices in Config/App-Info.plist (`_impromptu-add._tcp` and `._udp`).
     static let serviceType = "impromptu-add"
+    private static let inviteTimeout: TimeInterval = 10
+    /// How often phones that are found but not connected are invited (again).
+    private static let retryInterval: Duration = .seconds(3)
+    /// Normally only one of two phones invites; after this long without connecting, the other does too,
+    /// in case the first can't see it (Multipeer sometimes only finds a phone one way).
+    private static let inviteAnywayAfter: TimeInterval = 6
 
     var onEvent: ((NearbyFriendEvent) -> Void)?
 
@@ -86,6 +96,12 @@ final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
     private var browser: MCNearbyServiceBrowser?
     /// By the other phone's peer name.
     private var connections: [String: Connection] = [:]
+    /// Phones the browser can see, connected or not, and when each was first seen.
+    private var discovered: [String: (peerID: MCPeerID, since: Date)] = [:]
+    /// Invitations out or accepted, until they connect or fail.
+    private var invitedAt: [String: Date] = [:]
+    private var retryTask: Task<Void, Never>?
+    private var reportedConnecting = 0
 
     func start(as identity: NearbyIdentity) {
         stop()
@@ -103,14 +119,25 @@ final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
         self.browser = browser
         advertiser.startAdvertisingPeer()
         browser.startBrowsingForPeers()
+        retryTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.retryInterval)
+                self?.inviteWaitingPhones()
+            }
+        }
     }
 
     func stop() {
+        retryTask?.cancel()
+        retryTask = nil
         advertiser?.stopAdvertisingPeer()
         browser?.stopBrowsingForPeers()
         session?.disconnect()
         connections.values.forEach { $0.distanceSession?.invalidate() }
         connections = [:]
+        discovered = [:]
+        invitedAt = [:]
+        reportedConnecting = 0
         advertiser = nil
         browser = nil
         session = nil
@@ -138,13 +165,67 @@ final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
         connections[peerID.displayName] ?? Connection(peerID: peerID)
     }
 
-    /// Both phones see each other; only one invites, so they don't connect twice.
-    private func found(_ peerID: MCPeerID, by browser: MCNearbyServiceBrowser) {
-        guard let session, let myPeerID, myPeerID.displayName < peerID.displayName else { return }
-        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 15)
+    private func found(_ peerID: MCPeerID) {
+        if discovered[peerID.displayName] == nil { discovered[peerID.displayName] = (peerID, .now) }
+        reportConnecting()
+        if isFirstToInvite(peerID) { invite(peerID) }
+    }
+
+    private func lost(_ peerID: MCPeerID) {
+        discovered[peerID.displayName] = nil
+        reportConnecting()
+    }
+
+    /// When both phones see each other, only one invites, so they don't connect twice.
+    private func isFirstToInvite(_ peerID: MCPeerID) -> Bool {
+        guard let myPeerID else { return false }
+        return myPeerID.displayName < peerID.displayName
+    }
+
+    private func isConnected(_ peerId: String) -> Bool {
+        session?.connectedPeers.contains { $0.displayName == peerId } ?? false
+    }
+
+    private func isInviting(_ peerId: String) -> Bool {
+        invitedAt[peerId].map { Date.now.timeIntervalSince($0) < Self.inviteTimeout + 2 } ?? false
+    }
+
+    private func invite(_ peerID: MCPeerID) {
+        guard let session, let browser, !isConnected(peerID.displayName), !isInviting(peerID.displayName) else { return }
+        invitedAt[peerID.displayName] = .now
+        browser.invitePeer(peerID, to: session, withContext: nil, timeout: Self.inviteTimeout)
+    }
+
+    /// Every few seconds: invite again anyone found but not connected, in case an invitation failed.
+    private func inviteWaitingPhones() {
+        for (peerId, entry) in discovered where !isConnected(peerId) {
+            if isFirstToInvite(entry.peerID) || Date.now.timeIntervalSince(entry.since) > Self.inviteAnywayAfter {
+                invite(entry.peerID)
+            }
+        }
+    }
+
+    private func acceptsInvitation(from peerID: MCPeerID) -> Bool {
+        guard session != nil, !isConnected(peerID.displayName) else { return false }
+        invitedAt[peerID.displayName] = .now
+        return true
+    }
+
+    /// Phones found but not introduced yet, if the count changed.
+    private func reportConnecting() {
+        let count = discovered.keys.filter { connections[$0]?.peer == nil }.count
+        guard count != reportedConnecting else { return }
+        reportedConnecting = count
+        onEvent?(.connecting(count: count))
+    }
+
+    private func searchFailed(_ error: Error) {
+        let code = (error as NSError).code
+        onEvent?(.searchFailed("iOS stopped Impromptu from looking for phones nearby (error \(code))."))
     }
 
     private func didConnect(_ peerID: MCPeerID) {
+        invitedAt[peerID.displayName] = nil
         var connection = connection(for: peerID)
         if canMeasureDistance, connection.distanceSession == nil {
             let distanceSession = NISession()
@@ -162,7 +243,10 @@ final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
         send(.hello(identity, distanceToken: token), to: peerID.displayName)
     }
 
+    /// Also when an invitation fails; the retry picks them up again while they're still found.
     private func didDisconnect(_ peerID: MCPeerID) {
+        invitedAt[peerID.displayName] = nil
+        defer { reportConnecting() }
         guard let connection = connections.removeValue(forKey: peerID.displayName) else { return }
         connection.distanceSession?.invalidate()
         if connection.peer != nil { onEvent?(.lost(peerId: peerID.displayName)) }
@@ -182,6 +266,7 @@ final class NearbyFriendFinder: NSObject, NearbyFriendFinding {
             connections[peerId] = connection
             measureIfReady(peerId)
             onEvent?(.updated(peer))
+            reportConnecting()
         case .accept:
             onEvent?(.accepted(peerId: peerId))
         case .decline:
@@ -255,46 +340,72 @@ extension NearbyFriendFinder: MCSessionDelegate, MCNearbyServiceAdvertiserDelega
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID,
                                 withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
         DispatchQueue.main.async {
-            MainActor.assumeIsolated { invitationHandler(self.session != nil, self.session) }
+            MainActor.assumeIsolated {
+                // Turn down a second connection to a phone that's already connected.
+                let accepts = self.acceptsInvitation(from: peerID)
+                invitationHandler(accepts, accepts ? self.session : nil)
+            }
+        }
+    }
+
+    nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.searchFailed(error) }
         }
     }
 
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID,
                              withDiscoveryInfo info: [String: String]?) {
         DispatchQueue.main.async {
-            MainActor.assumeIsolated { self.found(peerID, by: browser) }
+            MainActor.assumeIsolated { self.found(peerID) }
         }
     }
 
-    // A lost peer is handled when its session disconnects.
-    nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {}
+    // Stops inviting them; a connected phone that leaves is handled when its session disconnects.
+    nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.lost(peerID) }
+        }
+    }
+
+    nonisolated func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.searchFailed(error) }
+        }
+    }
 }
 
 // MARK: - NISessionDelegate
-// Delivered on the main queue (`delegateQueue`).
+// `delegateQueue` is main, but hop explicitly like the Multipeer callbacks, in order.
 
 extension NearbyFriendFinder: NISessionDelegate {
     nonisolated func session(_ session: NISession, didUpdate nearbyObjects: [NINearbyObject]) {
         let distance = nearbyObjects.first?.distance
-        MainActor.assumeIsolated { updateDistance(distance, in: session) }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.updateDistance(distance, in: session) }
+        }
     }
 
     nonisolated func session(_ session: NISession, didRemove nearbyObjects: [NINearbyObject],
                              reason: NINearbyObject.RemovalReason) {
-        MainActor.assumeIsolated {
-            updateDistance(nil, in: session)
-            // Lost track for a moment; ask again with the same token.
-            if reason == .timeout, let configuration = session.configuration { session.run(configuration) }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                self.updateDistance(nil, in: session)
+                // Lost track for a moment; ask again with the same token.
+                if reason == .timeout, let configuration = session.configuration { session.run(configuration) }
+            }
         }
     }
 
     nonisolated func sessionSuspensionEnded(_ session: NISession) {
-        MainActor.assumeIsolated {
+        DispatchQueue.main.async {
             if let configuration = session.configuration { session.run(configuration) }
         }
     }
 
     nonisolated func session(_ session: NISession, didInvalidateWith error: Error) {
-        MainActor.assumeIsolated { distanceSessionEnded(session, error: error) }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.distanceSessionEnded(session, error: error) }
+        }
     }
 }

@@ -9,8 +9,9 @@ info:
     Deletes are soft: the row stays in the database with `deletedAt` set and is no longer returned.
 
     ## Google Calendar statuses
-    Once Google Calendar is connected, the server reads the rest of the user's day every 15 minutes.
-    Within a minute of an event starting, it picks one of the standard activities for it (with
+    Once Google Calendar is connected, the server reads the rest of the user's day every 30 seconds, from
+    their primary calendar and every other calendar they own and show in Google Calendar (not ones shared
+    with them), whenever the events were created. Within 30 seconds of an event starting, it picks one of the standard activities for it (with
     Gemini, standing in for Muse) and creates a status with `source: CALENDAR`, starting and ending
     with the event, and `note: null`. A cancelled, declined or moved event removes its status; a
     changed end time moves `expiresAt`. All-day events, events marked Free, out-of-office and
@@ -814,7 +815,7 @@ paths:
       summary: Check the calendar now
       description: |
         Re-reads today's events and creates statuses for events that have started, instead of waiting for the
-        next minute's run. Useful for pull-to-refresh.
+        next 30-second run. Useful for pull-to-refresh.
       operationId: checkGoogleCalendar
       responses:
         "200":
